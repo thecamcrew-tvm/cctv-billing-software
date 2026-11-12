@@ -1,0 +1,502 @@
+import { NextResponse } from "next/server";
+import {
+  ADMIN_SESSION_COOKIE,
+  verifyAdminSession,
+} from "@/lib/adminSession";
+
+const PUBLIC_ROUTES = new Set([
+  "/admin/login",
+  "/admin/logout",
+  "/api/admin/login",
+  "/api/admin/logout",
+]);
+
+export async function middleware(request) {
+  const pathname = request.nextUrl.pathname;
+  const isPublicRoute = PUBLIC_ROUTES.has(pathname);
+
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  const isAuthenticated =
+    Boolean(secret && secret.length >= 32) &&
+    (await verifyAdminSession(token, secret));
+
+  // Authenticated admins should see the dashboard, not the login form.
+  if (pathname === "/admin/login") {
+    if (isAuthenticated) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // The login API must be accessible before signing in; logout must remain
+  // accessible even if a cookie has expired.
+  if (isPublicRoute) {
+    return NextResponse.next();
+  }
+
+  if (!isAuthenticated) {
+    // Never return private API responses to unauthenticated clients.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Admin authentication required." },
+        {
+          status: 401,
+          headers: { "Cache-Control": "no-store" },
+        }
+      );
+    }
+
+    const loginUrl = new URL("/admin/login", request.url);
+    loginUrl.searchParams.set(
+      "next",
+      pathname + request.nextUrl.search
+    );
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  // Exclude Next.js assets and files in /public. All app pages and API routes
+  // except the explicitly public login/logout endpoints require a session.
+  matcher: [
+    "/((?!_next/|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|map|txt|woff|woff2|ttf|eot|webmanifest)).*)",
+  ],
+};
+
+
+export const ADMIN_SESSION_COOKIE = "cam_crew_admin_session";
+export const ADMIN_SESSION_SECONDS = 60 * 60 * 8; // 8 hours
+
+const encoder = new TextEncoder();
+const VERSION = "v1";
+
+function toHex(bytes) {
+  return Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
+}
+
+function fromHex(hex) {
+  if (!/^[0-9a-f]{64}$/.test(hex)) return null;
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+async function hmacKey(secret) {
+  return crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"]
+  );
+}
+
+export async function createAdminSession(secret) {
+  if (typeof secret !== "string" || secret.length < 32) {
+    throw new Error("ADMIN_SESSION_SECRET must be at least 32 characters.");
+  }
+
+  const expiresAt = Math.floor(Date.now() / 1000) + ADMIN_SESSION_SECONDS;
+  const nonce = crypto.randomUUID();
+  const message = `${VERSION}.${expiresAt}.${nonce}`;
+  const key = await hmacKey(secret);
+  const signature = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, encoder.encode(message))
+  );
+
+  return `${message}.${toHex(signature)}`;
+}
+
+export async function verifyAdminSession(token, secret) {
+  if (
+    typeof token !== "string" ||
+    typeof secret !== "string" ||
+    secret.length < 32
+  ) {
+    return false;
+  }
+
+  const parts = token.split(".");
+  if (parts.length !== 4) return false;
+
+  const [version, expiresText, nonce, signatureText] = parts;
+  if (version !== VERSION) return false;
+  if (!/^\d{10,12}$/.test(expiresText)) return false;
+  if (!/^[0-9a-f-]{36}$/.test(nonce)) return false;
+
+  const expiresAt = Number(expiresText);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) return false;
+  if (expiresAt > now + ADMIN_SESSION_SECONDS) return false;
+
+  const signature = fromHex(signatureText);
+  if (!signature) return false;
+
+  try {
+    const key = await hmacKey(secret);
+    return await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signature,
+      encoder.encode(`${version}.${expiresText}.${nonce}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+import { createHash, timingSafeEqual } from "node:crypto";
+import { NextResponse } from "next/server";
+import {
+  ADMIN_SESSION_COOKIE,
+  ADMIN_SESSION_SECONDS,
+  createAdminSession,
+} from "@/lib/adminSession";
+
+export const runtime = "nodejs";
+
+function equalConstantTime(a, b) {
+  const left = createHash("sha256").update(String(a)).digest();
+  const right = createHash("sha256").update(String(b)).digest();
+  return timingSafeEqual(left, right);
+}
+
+export async function POST(request) {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const sessionSecret = process.env.ADMIN_SESSION_SECRET;
+
+  if (
+    !adminEmail ||
+    !adminPassword ||
+    adminPassword.length < 12 ||
+    adminEmail === "admin@example.com" ||
+    !sessionSecret ||
+    sessionSecret.length < 32
+  ) {
+    return NextResponse.json(
+      { error: "Admin login is not configured. Check environment variables." },
+      { status: 503, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  let data;
+  try {
+    data = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid login request." },
+      { status: 400, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  const email =
+    typeof data?.email === "string" ? data.email.trim().toLowerCase() : "";
+  const password = typeof data?.password === "string" ? data.password : "";
+
+  if (!email || email.length > 254 || !password || password.length > 1024) {
+    return NextResponse.json(
+      { error: "Enter your email and password." },
+      { status: 400, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  const matches =
+    equalConstantTime(email, adminEmail) &&
+    equalConstantTime(password, adminPassword);
+
+  if (!matches) {
+    return NextResponse.json(
+      { error: "Invalid email or password." },
+      { status: 401, headers: { "Cache-Control": "no-store" } }
+    );
+  }
+
+  const token = await createAdminSession(sessionSecret);
+  const response = NextResponse.json(
+    { success: true },
+    { headers: { "Cache-Control": "no-store" } }
+  );
+
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: ADMIN_SESSION_SECONDS,
+  });
+
+  return response;
+}
+
+import { NextResponse } from "next/server";
+import { ADMIN_SESSION_COOKIE } from "@/lib/adminSession";
+
+export const runtime = "nodejs";
+
+export async function POST() {
+  const response = NextResponse.json(
+    { success: true, message: "Logged out successfully." },
+    { headers: { "Cache-Control": "no-store" } }
+  );
+
+  response.cookies.set(ADMIN_SESSION_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  });
+
+  return response;
+}
+
+"use client";
+
+import { useState } from "react";
+import {
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  Loader2,
+  ArrowRight,
+} from "lucide-react";
+
+function safeDestination(nextPath) {
+  if (
+    typeof nextPath !== "string" ||
+    !nextPath.startsWith("/") ||
+    nextPath.startsWith("//") ||
+    nextPath.includes("\\") ||
+    /^\/admin\/login(?:\/|\?|$)/.test(nextPath)
+  ) {
+    return "/";
+  }
+  return nextPath;
+}
+
+export default function AdminLoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (loading) return;
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
+        body: JSON.stringify({ email, password }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Login failed. Please try again.");
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      window.location.replace(safeDestination(params.get("next")));
+    } catch (err) {
+      setError(err.message || "Unable to sign in.");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#f4f7f3] px-4 py-10">
+      <div className="grid w-full max-w-[960px] overflow-hidden rounded-[26px] bg-white shadow-2xl md:grid-cols-[0.9fr_1.1fr]">
+        <div className="hidden flex-col justify-between bg-[#063c2c] p-10 text-white md:flex">
+          <div>
+            <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#d9b84c]/50 bg-white/10">
+              <ShieldCheck size={35} className="text-[#e6c463]" />
+            </div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#e2c672]">
+              Secure Admin Access
+            </p>
+            <h1 className="mt-5 text-3xl font-extrabold leading-tight">
+              The Cam Crew_TVM
+            </h1>
+            <p className="mt-4 max-w-xs text-sm leading-7 text-[#d3e4da]">
+              Billing Management System for invoices, customers, products,
+              payments and business reports.
+            </p>
+          </div>
+          <p className="text-xs text-[#bbd3c4]">
+            Automation &amp; Security Surveillance
+          </p>
+        </div>
+
+        <div className="px-6 py-12 sm:px-12 md:py-16">
+          <div className="mb-8 md:hidden">
+            <h1 className="text-lg font-extrabold text-[#073e2a]">
+              The Cam Crew_TVM
+            </h1>
+            <p className="text-xs text-gray-500">Billing Management System</p>
+          </div>
+
+          <div className="mb-8">
+            <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#e8f5eb] text-[#086b44]">
+              <LockKeyhole size={24} />
+            </div>
+            <h2 className="text-2xl font-extrabold text-[#12392b]">
+              Admin Login
+            </h2>
+            <p className="mt-2 text-sm text-gray-500">
+              Enter your registered email and password to continue.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="admin-email" className="mb-2 block text-sm font-semibold text-[#345344]">
+                Email address
+              </label>
+              <div className="relative">
+                <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="admin-email"
+                  type="email"
+                  autoComplete="username"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="admin@company.com"
+                  className="w-full rounded-xl border border-[#dce6dd] bg-white py-3.5 pl-11 pr-4 text-sm text-[#183b2a] outline-none focus:border-[#087e51] focus:ring-2 focus:ring-[#087e51]/15"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="admin-password" className="mb-2 block text-sm font-semibold text-[#345344]">
+                Password
+              </label>
+              <div className="relative">
+                <LockKeyhole size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="admin-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Enter admin password"
+                  className="w-full rounded-xl border border-[#dce6dd] bg-white py-3.5 pl-11 pr-12 text-sm text-[#183b2a] outline-none focus:border-[#087e51] focus:ring-2 focus:ring-[#087e51]/15"
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((old) => !old)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 hover:text-[#086b44]"
+                >
+                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#075d3e] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#054e34] disabled:cursor-wait disabled:opacity-60"
+            >
+              {loading ? (
+                <><Loader2 size={18} className="animate-spin" /> Signing in...</>
+              ) : (
+                <>Sign In <ArrowRight size={18} /></>
+              )}
+            </button>
+          </form>
+
+          <p className="mt-8 text-center text-xs text-gray-400">
+            Authorized staff access only
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+"use client";
+
+import { useEffect, useState } from "react";
+import { Loader2, LogOut } from "lucide-react";
+
+export default function AdminLogoutPage() {
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function logout() {
+      try {
+        const response = await fetch("/api/admin/logout", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Logout request failed.");
+        }
+        if (active) window.location.replace("/admin/login");
+      } catch (err) {
+        console.error("Logout error:", err);
+        if (active) setError("Unable to logout. Please try again.");
+      }
+    }
+
+    logout();
+    return () => { active = false; };
+  }, []);
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#f4f7f3] p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-[#e5eae5] bg-white p-8 text-center shadow-lg">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e7f3e9] text-[#08633c]">
+          <LogOut size={28} />
+        </div>
+        <h1 className="text-xl font-bold text-[#173c2b]">The Cam Crew_TVM</h1>
+        {error ? (
+          <>
+            <p role="alert" className="mt-4 text-sm text-red-600">{error}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-5 rounded-lg bg-[#075d3e] px-5 py-2.5 text-sm font-semibold text-white"
+            >
+              Retry Logout
+            </button>
+          </>
+        ) : (
+          <p className="mt-5 flex items-center justify-center gap-2 text-sm text-gray-600">
+            <Loader2 size={18} className="animate-spin" /> Signing out...
+          </p>
+        )}
+      </div>
+    </main>
+  );
+}

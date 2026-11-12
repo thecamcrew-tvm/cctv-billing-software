@@ -1,0 +1,414 @@
+
+.cam-admin-login,
+.cam-admin-login * {
+  box-sizing: border-box;
+}
+
+.cam-admin-login {
+  min-height: 100vh;
+  color: #17382c;
+  background: #f8f9f5;
+  font-family: Inter, Arial, Helvetica, sans-serif;
+}
+
+.cam-admin-login-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.06fr) minmax(430px, 0.94fr);
+}
+
+/* LEFT PANEL */
+
+.cam-admin-login-intro {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  padding: clamp(28px, 4.2vw, 64px);
+  color: #fff;
+
+  background:
+    radial-gradient(
+      circle at 96% 18%,
+      #226c4f 0,
+      transparent 37%
+    ),
+    linear-gradient(
+      145deg,
+      #073f2c 0%,
+      #042c20 75%,
+      #03241a 100%
+    );
+}
+
+.cam-admin-login-intro::after {
+  content: "";
+  position: absolute;
+  width: 440px;
+  height: 440px;
+  right: -200px;
+  bottom: -200px;
+  border: 1px solid #ffffff18;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 64px #ffffff06,
+    0 0 0 128px #ffffff04;
+}
+
+.cam-admin-brand,
+.cam-admin-intro-content,
+.cam-admin-intro-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.cam-admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.cam-admin-brand-icon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+
+  color: #f8d782;
+  background: #ffffff13;
+  border: 1px solid #ffffff2e;
+  border-radius: 12px;
+}
+
+.cam-admin-brand strong {
+  display: block;
+  font-size: 18px;
+  letter-spacing: -0.35px;
+  font-weight: 800;
+}
+
+.cam-admin-brand > div > span {
+  display: block;
+  margin-top: 3px;
+  color: #c5dacf;
+  font-size: 11px;
+}
+
+.cam-admin-red {
+  color: #f2ab88;
+}
+
+.cam-admin-intro-content {
+  max-width: 560px;
+  padding: 72px 0;
+}
+
+.cam-admin-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #e1c578;
+  font-size: 11px;
+  letter-spacing: 1.8px;
+  font-weight: 800;
+}
+
+.cam-admin-eyebrow span {
+  width: 17px;
+  height: 2px;
+  background: #e1c578;
+}
+
+.cam-admin-intro-content h1 {
+  margin: 24px 0 18px;
+  font-size: clamp(38px, 4.35vw, 66px);
+  line-height: 1.11;
+  letter-spacing: -1.9px;
+  font-weight: 800;
+}
+
+.cam-admin-intro-content h1 em {
+  display: block;
+  color: #e6ce90;
+  font-style: normal;
+}
+
+.cam-admin-intro-content > p {
+  max-width: 430px;
+  margin: 0;
+  color: #c4d8cc;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.cam-admin-feature-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 40px;
+}
+
+.cam-admin-feature-list > div {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: #f1f6f2;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cam-admin-feature-list svg {
+  color: #e4c77a;
+  flex-shrink: 0;
+}
+
+.cam-admin-intro-footer {
+  color: #aec5b7;
+  font-size: 12px;
+}
+
+/* RIGHT PANEL */
+
+.cam-admin-login-form-panel {
+  position: relative;
+  min-height: 100vh;
+  padding: 40px clamp(24px, 5.5vw, 94px);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #f9faf7;
+}
+
+.cam-admin-login-form-container {
+  width: 100%;
+  max-width: 420px;
+  padding: 36px 0;
+}
+
+.cam-admin-login-header {
+  margin-bottom: 32px;
+}
+
+.cam-admin-login-lock {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 24px;
+  border: 1px solid #cfe0d4;
+  border-radius: 16px;
+  background: #e8f4eb;
+  color: #0a6942;
+
+  display: grid;
+  place-items: center;
+}
+
+.cam-admin-login-kicker {
+  color: #b18d3c;
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  font-weight: 800;
+}
+
+.cam-admin-login-header h2 {
+  margin: 9px 0 10px;
+  color: #103d29;
+  font-size: clamp(30px, 3.2vw, 40px);
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.cam-admin-login-header p {
+  margin: 0;
+  color: #6d7e72;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* FORM */
+
+.cam-admin-login-form {
+  display: grid;
+  gap: 19px;
+}
+
+.cam-admin-form-field > label {
+  display: block;
+  margin-bottom: 8px;
+  color: #304b39;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cam-admin-input-wrap {
+  min-height: 53px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  padding: 0 14px;
+  border: 1px solid #d5dfd5;
+  border-radius: 10px;
+  background: #fff;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.cam-admin-input-wrap:focus-within {
+  border-color: #16704a;
+  box-shadow: 0 0 0 3px #0c76511b;
+}
+
+.cam-admin-input-wrap > svg {
+  color: #829487;
+  flex-shrink: 0;
+}
+
+.cam-admin-input-wrap input {
+  width: 100%;
+  min-width: 0;
+  height: 51px;
+
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #1b3526;
+
+  font: 500 13px Arial, sans-serif;
+}
+
+.cam-admin-input-wrap input::placeholder {
+  color: #99a59b;
+}
+
+.cam-admin-show-password {
+  border: 0;
+  padding: 5px;
+  color: #7b8a7e;
+  cursor: pointer;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+
+.cam-admin-show-password:hover {
+  color: #0a6740;
+}
+
+/* SUBMIT */
+
+.cam-admin-login-submit {
+  width: 100%;
+  min-height: 53px;
+  margin-top: 8px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+
+  background: #08633f;
+  border: 1px solid #08633f;
+  border-radius: 10px;
+  color: #fff;
+  font: 700 13px Arial, sans-serif;
+  cursor: pointer;
+}
+
+.cam-admin-login-submit:not(:disabled):hover {
+  background: #034e30;
+}
+
+.cam-admin-login-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.cam-admin-login-error {
+  padding: 12px 13px;
+  border: 1px solid #f0c8c4;
+  border-radius: 8px;
+  background: #fff0ef;
+  color: #9e312c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cam-admin-password-help {
+  color: #819087;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0;
+  text-align: center;
+}
+
+.cam-admin-login-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #e4eae4;
+
+  font-size: 11px;
+  color: #89978c;
+}
+
+.cam-admin-login-copyright {
+  position: absolute;
+  bottom: 22px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  color: #a0afa3;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 960px) {
+  .cam-admin-login-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cam-admin-login-intro {
+    min-height: auto;
+    padding: 26px 24px;
+  }
+
+  .cam-admin-intro-content,
+  .cam-admin-intro-footer {
+    display: none;
+  }
+
+  .cam-admin-login-form-panel {
+    min-height: calc(100vh - 102px);
+    padding: 25px 22px 60px;
+  }
+
+  .cam-admin-login-form-container {
+    padding: 20px 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .cam-admin-brand strong {
+    font-size: 16px;
+  }
+
+  .cam-admin-brand > div > span {
+    font-size: 10px;
+  }
+
+  .cam-admin-login-header {
+    margin-bottom: 24px;
+  }
+}
