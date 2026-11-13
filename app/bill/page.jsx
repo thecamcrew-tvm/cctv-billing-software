@@ -833,7 +833,7 @@ useEffect(() => {
           <span>Classic black &amp; white A4 tax invoice</span>
         </div>
         <div className="gst-toolbar-actions">
-          <button type="button" className="gst-btn gst-btn-outline" onClick={() => window.location.assign("/")}>
+          <button type="button" className="gst-btn gst-btn-outline" onClick={() => window.location.assign("/admin/dashboard")}>
             <ArrowLeft size={15} /> Dashboard
           </button>
           <button type="button" className="gst-btn gst-btn-outline" onClick={() => setEditing((old) => !old)}>
