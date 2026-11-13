@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Eye,
   EyeOff,
@@ -99,7 +99,16 @@ export default function AdminLoginPage() {
       }
 
       // API set the signed admin-session cookie successfully.
-      window.location.replace(getSafeDestination());
+      const destination = getSafeDestination();
+const target = new URL(destination, window.location.origin);
+
+if (target.pathname === "/admin/dashboard") {
+  target.searchParams.set("fromLogin", "1");
+}
+
+window.location.replace(
+  target.pathname + target.search + target.hash
+);
     } catch {
       setError("Unable to reach the server. Check your connection.");
     } finally {

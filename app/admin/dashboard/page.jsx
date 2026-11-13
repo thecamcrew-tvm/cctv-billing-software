@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StoreProvider } from "@/lib/store";
 import Shell from "@/components/Shell";
 
@@ -62,9 +62,24 @@ function BillingDashboard() {
 }
 
 export default function AdminDashboardPage() {
+  useEffect(() => {
+    const url = new URL(window.location.href);
+
+    if (url.searchParams.get("fromLogin") === "1") {
+      url.searchParams.delete("fromLogin");
+
+      window.history.replaceState(
+        window.history.state,
+        "",
+        url.pathname + url.search + url.hash
+      );
+    }
+  }, []);
+
   return (
     <StoreProvider>
       <BillingDashboard />
     </StoreProvider>
   );
 }
+

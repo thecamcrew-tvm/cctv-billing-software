@@ -1,23 +1,42 @@
+
 import { NextResponse } from "next/server";
+
 import {
   ADMIN_SESSION_COOKIE,
   verifyAdminSession,
 } from "@/lib/adminSession";
 
-// Anyone who opens the site root sees the login page first.
-// The dashboard is still protected by the signed admin session.
 export async function middleware(request) {
   const { pathname, search } = request.nextUrl;
 
-  // Always show the login URL when someone opens the homepage.
-  // This applies even when the browser already has an admin cookie.
-  if (pathname === "/") {
-    return NextResponse.redirect(new URL("/admin/login", request.url));
+  const secret = process.env.ADMIN_SESSION_SECRET;
+
+  const token = request.cookies.get(
+    ADMIN_SESSION_COOKIE
+  )?.value;
+
+  // Verify admin login session
+  let isAuthenticated = false;
+
+  if (token && secret && secret.length >= 32) {
+    try {
+      isAuthenticated = Boolean(
+        await verifyAdminSession(token, secret)
+      );
+    } catch (error) {
+      console.error("Session verification failed:", error);
+      isAuthenticated = false;
+    }
   }
 
-  // Keep login/logout pages and their API routes accessible.
-  // Do NOT redirect an authenticated visitor away from /admin/login,
-  // otherwise the homepage-to-login redirect can create a loop.
+  // Homepage always opens login
+  if (pathname === "/") {
+    return NextResponse.redirect(
+      new URL("/admin/login", request.url)
+    );
+  }
+
+  // Allow login and logout pages
   if (
     pathname === "/admin/login" ||
     pathname === "/admin/logout" ||
@@ -27,37 +46,60 @@ export async function middleware(request) {
     return NextResponse.next();
   }
 
-  const secret = process.env.ADMIN_SESSION_SECRET;
-  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-
-  let isAuthenticated = false;
-  if (secret && secret.length >= 32 && token) {
-    try {
-      isAuthenticated = Boolean(await verifyAdminSession(token, secret));
-    } catch {
-      isAuthenticated = false;
+  // Dashboard protection
+  if (pathname === "/admin/dashboard") {
+    // User must be authenticated
+    if (!isAuthenticated) {
+      return NextResponse.redirect(
+        new URL("/admin/login", request.url)
+      );
     }
-  }
 
-  // A valid session is required for the dashboard and other private routes.
-  if (isAuthenticated) {
+    // Direct dashboard URL should open login
+    const fromLogin =
+      request.nextUrl.searchParams.get("fromLogin");
+
+    if (fromLogin !== "1") {
+      return NextResponse.redirect(
+        new URL("/admin/login", request.url)
+      );
+    }
+
+    // Allow dashboard after login
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.json(
-      { error: "Admin authentication required." },
-      { status: 401, headers: { "Cache-Control": "no-store" } }
+  // Protect remaining admin pages and billing APIs
+  if (!isAuthenticated) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Admin authentication required." },
+        { status: 401 }
+      );
+    }
+
+    const loginUrl = new URL(
+      "/admin/login",
+      request.url
     );
+
+    loginUrl.searchParams.set(
+      "next",
+      pathname + search
+    );
+
+    return NextResponse.redirect(loginUrl);
   }
 
-  const loginUrl = new URL("/admin/login", request.url);
-  loginUrl.searchParams.set("next", `${pathname}${search}`);
-  return NextResponse.redirect(loginUrl);
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|css|js|map|txt|woff|woff2|ttf|eot|webmanifest)).*)",
+    "/",
+    "/admin/:path*",
+    "/bill/:path*",
+    "/api/admin/:path*",
+    "/api/billing/:path*",
   ],
 };
