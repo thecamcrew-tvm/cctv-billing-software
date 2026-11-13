@@ -20,14 +20,22 @@ export async function GET(request) {
   if (!(await isBillingAdmin(request))) {
     return json({ error: "Login required." }, 401);
   }
+
   try {
     return json({ state: await readBillingState() });
   } catch (error) {
     console.error("Billing Firestore read failed:", error);
-    return json({ error: "Could not load billing data from Firebase. Check server credentials and Firestore setup." }, 503);
-  }
-}
 
+    return json(
+      {
+        error:
+          "Could not load billing data from Firebase. Check server credentials and Firestore setup.",
+      },
+      503
+    );
+  }
+} 
+// Closes the GET function
 export async function POST(request) {
   if (!(await isBillingAdmin(request))) {
     return json({ error: "Login required." }, 401);
