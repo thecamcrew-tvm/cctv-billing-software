@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo, useEffect, useRef, useId } from 'react';
 import { useStore } from '@/lib/store';
-import { productPurchasePrice, maxAllowedLineDiscount, lineDiscountError, isServiceProduct } from '@/lib/billingDiscountLimit';
+import { productPurchasePrice, maxAllowedLineDiscount, lineDiscountError, isServiceProduct } from '@/components/billingDiscountLimit';
 import { currency, shortCurrency, niceDate, isoToday } from '@/lib/data';
 import { SummaryCards, SalesGraph, PaymentAnalytics, RecentInvoices, QuickActions } from './Widgets';
 import { Plus, Search, Eye, Trash2, Printer, ArrowLeft, Save, Check, Download, FileText, Users, Package, Wallet, Receipt, ChartNoAxesCombined, Settings as SettingsIcon, RotateCcw, Edit2, CalendarDays, X } from 'lucide-react';

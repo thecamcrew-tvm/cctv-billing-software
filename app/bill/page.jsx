@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { productPurchasePrice, maxAllowedLineDiscount, lineDiscountError, isServiceProduct } from "@/lib/billingDiscountLimit";
+import { productPurchasePrice, maxAllowedLineDiscount, lineDiscountError, isServiceProduct } from "@/components/billingDiscountLimit";
 import "./bill.css";
 import "./bill-split-edit.css";
 

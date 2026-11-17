@@ -305,8 +305,7 @@ export default function ClientRequestPage() {
           <Link className={styles.brand} href="/"><span className={styles.logo}><ShieldCheck size={23}/></span><span><b>The Cam Crew_TVM</b><small>Automation & Security Surveillance</small></span></Link>
           <div className={styles.headerActions}>
             <Link href="/" className={styles.backLink}><ArrowLeft size={17}/> Home</Link>
-            <Link href="/admin/login" className={styles.loginLink}><LockKeyhole size={16}/> Billing Login</Link>
-          </div>
+            </div>
         </div>
       </header>
 
