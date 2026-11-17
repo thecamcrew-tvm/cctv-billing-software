@@ -1,0 +1,485 @@
+.section * {
+box-sizing: border-box;
+
+}
+.section {
+--navy: #071f4b;
+--navy-deep: #031333;
+--royal: #17478e;
+--gold: #e5a523;
+--gold-light: #ffd779;
+--ink: #071a39;
+position: relative;
+isolation: isolate;
+overflow: hidden;
+padding: 82px 20px 75px;
+font-family: Inter, "Segoe UI", Arial, sans-serif;
+color: var(--ink);
+background:
+  radial-gradient(ellipse 44% 40% at 50% 76%, rgba(32, 99, 182, .13), transparent 85%),
+  radial-gradient(ellipse 40% 42% at 0% 50%, rgba(218, 231, 248, .69), transparent 82%),
+  radial-gradient(ellipse 36% 34% at 100% 45%, rgba(218, 230, 248, .66), transparent 85%),
+  linear-gradient(180deg, #ffffff 0%, #f6f9ff 35%, #e5edf8 76%, #fafcff 100%);
+
+}
+.section::before {
+content: "";
+position: absolute;
+inset: 0;
+z-index: -1;
+pointer-events: none;
+background:
+  radial-gradient(circle at 15% 32%, rgba(255, 255, 255, .9), transparent 22%),
+  radial-gradient(circle at 84% 30%, rgba(255, 255, 255, .82), transparent 25%),
+  radial-gradient(ellipse 44% 16% at 50% 84%, rgba(15, 45, 101, .17), transparent 75%);
+
+}
+.section::after {
+content: "";
+position: absolute;
+left: -10%;
+right: -10%;
+bottom: 0;
+height: 30%;
+z-index: -1;
+pointer-events: none;
+opacity: .25;
+background-image:
+  linear-gradient(to right, rgba(9, 47, 104, .16) 1px, transparent 1px),
+  linear-gradient(to bottom, rgba(9, 47, 104, .16) 1px, transparent 1px);
+background-size: 66px 66px;
+transform: perspective(450px) rotateX(67deg) scale(1.35);
+transform-origin: center bottom;
+mask-image: linear-gradient(to bottom, transparent, #000 80%);
+
+}
+.sectionInner {
+position: relative;
+width: 100%;
+max-width: 1370px;
+margin: 0 auto;
+text-align: center;
+
+}
+.eyebrow {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+margin: 0 0 17px;
+padding: 9px 20px;
+border: 1px solid rgba(231, 173, 55, .45);
+border-radius: 999px;
+background: #fff7e7;
+color: #895916;
+font-size: 11px;
+font-weight: 850;
+letter-spacing: .15em;
+box-shadow: 0 5px 20px rgba(226, 168, 54, .12);
+
+}
+.heading {
+margin: 0;
+font-size: clamp(30px, 4vw, 53px);
+font-weight: 900;
+letter-spacing: -.055em;
+line-height: 1.12;
+color: var(--navy-deep);
+text-wrap: balance;
+
+}
+.heading span {
+color: var(--navy);
+background: linear-gradient(105deg, #092957, #24569b 78%, #0b3063);
+background-clip: text;
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+
+}
+.intro {
+max-width: 720px;
+margin: 14px auto 0;
+font-size: clamp(14px, 1.35vw, 17px);
+line-height: 1.6;
+color: #556a86;
+
+}
+/* Animation transforms for .orbitCard are set by OrbitingServices.jsx. */
+
+.orbitStage {
+position: relative;
+width: 100%;
+height: 650px;
+margin: 24px auto -14px;
+perspective: 1250px;
+transform-style: preserve-3d;
+overflow: visible;
+
+}
+.orbitStage::before {
+content: "";
+position: absolute;
+left: 50%;
+top: 65%;
+width: min(1100px, 92%);
+height: 235px;
+border-radius: 50%;
+transform: translate(-50%, -50%);
+pointer-events: none;
+background: radial-gradient(ellipse, rgba(9, 35, 82, .35), rgba(12, 58, 121, .18) 45%, transparent 74%);
+filter: blur(22px);
+
+}
+.orbitStage::after {
+content: "";
+position: absolute;
+left: 50%;
+top: 74%;
+width: min(900px, 76%);
+height: 100px;
+border-radius: 50%;
+transform: translate(-50%, -50%);
+pointer-events: none;
+background: radial-gradient(ellipse, rgba(235, 174, 60, .28), rgba(18, 71, 144, .11) 56%, transparent 80%);
+filter: blur(21px);
+
+}
+/* Gold-and-blue elliptical light platform. */
+
+.ellipse {
+position: absolute;
+z-index: 1;
+top: 58%;
+left: 50%;
+width: 87%;
+height: 62%;
+transform: translate(-50%, -50%) rotateX(62deg);
+border: 4px solid var(--gold-light);
+border-radius: 50%;
+background: radial-gradient(ellipse at center, rgba(8, 38, 88, .06), rgba(18, 65, 126, .09) 55%, transparent 74%);
+box-shadow:
+  0 0 1px 2px rgba(255,255,255,.9),
+  0 0 12px 4px rgba(255, 209, 115, .85),
+  0 0 32px 8px rgba(218, 157, 36, .45),
+  0 0 64px 10px rgba(24, 82, 158, .23),
+  inset 0 0 18px 2px rgba(251, 198, 93, .63),
+  inset 0 0 43px rgba(16, 79, 165, .25);
+pointer-events: none;
+animation: goldRingPulse 5s ease-in-out infinite alternate;
+
+}
+.ellipse::before {
+content: "";
+position: absolute;
+inset: -23px;
+border: 2px solid rgba(255, 207, 108, .70);
+border-radius: inherit;
+box-shadow: 0 0 16px rgba(233, 169, 56, .30), inset 0 0 12px rgba(255, 206, 95, .23);
+
+}
+.ellipse::after {
+content: "";
+position: absolute;
+inset: 16px;
+border: 2px solid rgba(31, 92, 184, .62);
+border-radius: inherit;
+box-shadow: inset 0 0 23px rgba(41, 115, 225, .34), 0 0 14px rgba(35, 101, 213, .24);
+
+}
+.innerGlow {
+position: absolute;
+top: 61%;
+left: 50%;
+width: 74%;
+height: 42%;
+transform: translate(-50%, -50%);
+border-radius: 50%;
+pointer-events: none;
+filter: blur(22px);
+background: radial-gradient(ellipse, rgba(255, 207, 117, .25), rgba(33, 105, 189, .16) 48%, transparent 77%);
+animation: goldFloorGlow 4s ease-in-out infinite alternate;
+
+}
+/* Center badge sits behind the moving cards. */
+
+.centerBrand {
+position: absolute;
+top: 57%;
+left: 50%;
+z-index: 1;
+width: min(275px, 32%);
+min-height: 118px;
+padding: 18px 14px;
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+gap: 7px;
+transform: translate(-50%, -50%);
+pointer-events: none;
+color: #fff;
+border: 1px solid rgba(255, 217, 134, .72);
+border-radius: 22px;
+background: linear-gradient(155deg, rgba(13, 56, 120, .94), rgba(2, 22, 61, .97));
+box-shadow: 0 15px 40px rgba(3, 27, 71, .24), 0 0 25px rgba(235, 175, 63, .23), inset 0 1px 0 rgba(255,255,255,.18);
+
+}
+.centerBrand svg { color: #ffcf71; width: 34px; height: 34px; }
+
+.centerBrand strong { font-size: clamp(14px, 1.55vw, 19px); font-weight: 900; white-space: nowrap; letter-spacing: -.035em; }
+
+.centerBrand span { color: #e7d2a4; font-size: 9px; font-weight: 750; letter-spacing: .13em; }
+/* Floating product + text cards. Do NOT animate transform here. */
+
+.orbitCard {
+position: absolute;
+top: 50%;
+left: 50%;
+width: clamp(188px, 18.2vw, 247px);
+min-height: 282px;
+padding: 15px 16px 19px;
+display: flex;
+flex-direction: column;
+align-items: stretch;
+color: var(--ink);
+text-align: center;
+border: 1px solid rgba(227, 233, 246, .99);
+border-radius: 28px;
+background: linear-gradient(156deg, #fff 0%, #fff 43%, #f4f7fe 83%, #e9effa 100%);
+box-shadow:
+  inset 0 2px 1px rgba(255,255,255,.98),
+  inset 0 -6px 14px rgba(31, 76, 148, .06),
+  0 5px 0 rgba(214, 223, 239, .96),
+  0 12px 0 rgba(31, 69, 121, .19),
+  0 25px 35px rgba(3, 27, 78, .19),
+  0 42px 56px rgba(3, 27, 78, .12),
+  0 0 16px rgba(228, 167, 49, .12);
+transform: translate3d(-50%, -50%, 0);
+transform-style: preserve-3d;
+backface-visibility: hidden;
+-webkit-backface-visibility: hidden;
+will-change: transform;
+
+}
+.orbitCard::before {
+content: "";
+position: absolute;
+inset: -3px;
+z-index: -1;
+border: 1px solid rgba(229, 172, 51, .40);
+border-radius: 30px;
+pointer-events: none;
+box-shadow: 0 0 22px rgba(218, 160, 54, .13);
+
+}
+.orbitCard::after {
+content: "";
+position: absolute;
+bottom: -23px;
+left: 20%;
+right: 20%;
+height: 9px;
+background: rgba(3, 26, 76, .20);
+filter: blur(11px);
+border-radius: 50%;
+pointer-events: none;
+
+}
+/* Category pill: royal navy + subtle metallic gold trim. */
+
+.cardTop {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 8px;
+
+}
+.cardLabel {
+display: inline-flex;
+align-items: center;
+min-height: 27px;
+padding: 6px 11px;
+color: #fff;
+border-radius: 999px;
+background: linear-gradient(135deg, #174b98, #071f4b 77%);
+box-shadow: 0 5px 12px rgba(7, 35, 90, .18), inset 0 1px 0 rgba(255,255,255,.22);
+font-size: 9px;
+font-weight: 900;
+letter-spacing: .06em;
+white-space: nowrap;
+
+}
+.cardTop svg {
+width: 28px;
+height: 28px;
+flex: 0 0 auto;
+padding: 5px;
+color: #17447f;
+border: 1px solid rgba(227, 177, 72, .45);
+border-radius: 9px;
+background: #fff9ea;
+
+}
+.serviceImage {
+width: 100%;
+height: 128px;
+display: flex;
+align-items: center;
+justify-content: center;
+margin: 10px auto 5px;
+overflow: hidden;
+border: 1px solid rgba(190, 208, 237, .48);
+border-radius: 16px;
+background: #061b42 url("/services/service-tech-bg.jpg") center / cover no-repeat;
+box-shadow: inset 0 1px 3px rgba(255,255,255,.98);
+
+}
+.serviceImage img {
+display: block;
+width: 100%;
+height: 100%;
+object-fit: contain;
+pointer-events: none;
+user-select: none;
+-webkit-user-drag: none;
+
+}
+.orbitCard h3 {
+margin: 11px 0 7px;
+color: #061c43;
+font-size: clamp(18px, 1.7vw, 23px);
+font-weight: 900;
+letter-spacing: -.045em;
+line-height: 1.14;
+
+}
+.orbitCard h3::after {
+content: "";
+display: block;
+width: 39px;
+height: 3px;
+margin: 9px auto 0;
+border-radius: 8px;
+background: linear-gradient(90deg, #d78a0c, #f6c658);
+
+}
+.orbitCard p {
+max-width: 200px;
+margin: 0 auto;
+color: #52617a;
+font-size: 11px;
+line-height: 1.43;
+
+}
+/* Never pause the orbit when hovered or focused. */
+
+.orbitStage:hover .orbitCard,
+
+.orbitCard:hover,
+
+.orbitCard:focus-within {
+animation-play-state: running;
+
+}
+.mobileGrid { display: none; }
+.cta {
+position: relative;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+gap: 11px;
+margin: 0 auto;
+padding: 16px 30px;
+border: 2px solid #e9ac3a;
+border-radius: 999px;
+color: #fff !important;
+background: linear-gradient(115deg, #0a3474, #061a43 74%);
+font-size: 15px;
+font-weight: 850;
+text-decoration: none;
+box-shadow: 0 8px 0 rgba(15, 41, 91, .13), 0 16px 26px rgba(12, 43, 105, .20), inset 0 1px 0 rgba(255,255,255,.20);
+transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+
+}
+.cta svg { transition: transform .25s ease; }
+
+.cta:hover {
+transform: translateY(-3px);
+box-shadow: 0 10px 0 rgba(15, 41, 91, .10), 0 19px 30px rgba(12, 43, 105, .24);
+
+}
+
+.cta:hover svg { transform: translate(3px, -2px); }
+
+.cta:focus-visible { outline: 3px solid #dda52d; outline-offset: 5px; }
+@keyframes goldRingPulse {
+from { filter: brightness(.94); }
+to { filter: brightness(1.18); }
+}
+
+@keyframes goldFloorGlow {
+from { opacity: .62; }
+to { opacity: 1; }
+}
+@media (max-width: 1160px) and (min-width: 981px) {
+.orbitStage { height: 590px; }
+.orbitCard { width: clamp(178px, 19vw, 219px); min-height: 252px; padding: 12px 11px 15px; }
+.serviceImage { height: 104px; }
+.orbitCard h3 { font-size: 18px; }
+.centerBrand { width: 225px; }
+}
+@media (max-width: 980px) {
+.section { padding: 66px 18px 65px; }
+.orbitStage { display: none; }
+.mobileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 760px;
+  margin: 37px auto 31px;
+  text-align: left;
+}
+.mobileCard {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid rgba(195, 208, 230, .86);
+  border-radius: 21px;
+  background: linear-gradient(145deg, #fff, #f4f7fc);
+  box-shadow: 0 6px 0 rgba(195, 207, 225, .40), 0 19px 29px rgba(13, 44, 96, .10);
+}
+.mobileImage {
+  flex: 0 0 112px;
+  width: 112px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(226, 175, 70, .35);
+  border-radius: 13px;
+  background: #061b42 url("/services/service-tech-bg.jpg") center / cover no-repeat;
+}
+.mobileImage img { width: 100%; height: 100%; object-fit: contain; }
+.mobileCard div { min-width: 0; }
+.mobileCard span { color: #a67016; font-size: 10px; font-weight: 900; letter-spacing: .07em; }
+.mobileCard strong { display: block; margin: 6px 0; color: #071f4b; font-size: 18px; }
+.mobileCard p { margin: 0; color: #5a6a83; font-size: 12px; line-height: 1.45; }
+}
+@media (max-width: 580px) {
+.section { padding: 54px 14px 60px; }
+.eyebrow { padding: 8px 12px; font-size: 9px; }
+.heading { font-size: clamp(27px, 7.5vw, 37px); }
+.intro { font-size: 13px; }
+.mobileGrid { grid-template-columns: 1fr; gap: 13px; margin: 30px auto 27px; }
+.mobileCard { padding: 15px; }
+.mobileImage { flex-basis: 95px; width: 95px; height: 76px; }
+.mobileCard strong { font-size: 16px; }
+.cta { padding: 14px 18px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+.ellipse, .innerGlow { animation: none !important; }
+.cta, .cta svg { transition: none !important; }
+.cta:hover, .cta:hover svg { transform: none !important; }
+}

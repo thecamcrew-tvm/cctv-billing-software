@@ -1,64 +1,77 @@
-
 .cam-admin-login,
 .cam-admin-login * {
   box-sizing: border-box;
 }
 
 .cam-admin-login {
+  --cam-navy: #071e49;
+  --cam-navy-dark: #04142f;
+  --cam-blue: #154b93;
+  --cam-royal: #2259a1;
+  --cam-gold: #e4ad44;
+  --cam-gold-soft: #ffd783;
+  --cam-ink: #102c52;
+  --cam-muted: #687e9b;
+  --cam-border: #dce5f1;
+
   min-height: 100vh;
-  color: #17382c;
-  background: #f8f9f5;
-  font-family: Inter, Arial, Helvetica, sans-serif;
+  color: var(--cam-ink);
+  background: #f5f8fe;
+  font-family: Inter, "Segoe UI", Arial, Helvetica, sans-serif;
 }
 
 .cam-admin-login-layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns:
-    minmax(0, 1.06fr) minmax(430px, 0.94fr);
+  grid-template-columns: minmax(0, 1.06fr) minmax(430px, 0.94fr);
 }
 
-/* LEFT PANEL */
+/* ======================== LEFT PANEL ======================== */
 
 .cam-admin-login-intro {
   position: relative;
+  isolation: isolate;
   min-height: 100vh;
   overflow: hidden;
-
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-
   padding: clamp(28px, 4.2vw, 64px);
   color: #fff;
-
   background:
-    radial-gradient(
-      circle at 96% 18%,
-      #226c4f 0,
-      transparent 37%
-    ),
-    linear-gradient(
-      145deg,
-      #073f2c 0%,
-      #042c20 75%,
-      #03241a 100%
-    );
+    radial-gradient(circle at 93% 13%, rgba(67, 131, 223, 0.42) 0, transparent 36%),
+    radial-gradient(circle at 6% 89%, rgba(229, 171, 59, 0.15) 0, transparent 35%),
+    linear-gradient(145deg, #103d7e 0%, #071e49 56%, #04142f 100%);
+}
+
+/* Quiet technical grid behind the content. */
+.cam-admin-login-intro::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: linear-gradient(130deg, transparent 10%, #000 100%);
+  pointer-events: none;
 }
 
 .cam-admin-login-intro::after {
   content: "";
   position: absolute;
+  z-index: 0;
   width: 440px;
   height: 440px;
   right: -200px;
   bottom: -200px;
-  border: 1px solid #ffffff18;
+  border: 1px solid rgba(255, 215, 131, 0.22);
   border-radius: 50%;
   pointer-events: none;
   box-shadow:
-    0 0 0 64px #ffffff06,
-    0 0 0 128px #ffffff04;
+    0 0 0 64px rgba(255, 255, 255, 0.035),
+    0 0 0 128px rgba(255, 255, 255, 0.018);
 }
 
 .cam-admin-brand,
@@ -75,16 +88,16 @@
 }
 
 .cam-admin-brand-icon {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
-
-  color: #f8d782;
-  background: #ffffff13;
-  border: 1px solid #ffffff2e;
-  border-radius: 12px;
+  color: var(--cam-gold-soft);
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 215, 131, 0.36);
+  border-radius: 13px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .cam-admin-brand strong {
@@ -97,12 +110,12 @@
 .cam-admin-brand > div > span {
   display: block;
   margin-top: 3px;
-  color: #c5dacf;
+  color: #c6d6ed;
   font-size: 11px;
 }
 
 .cam-admin-red {
-  color: #f2ab88;
+  color: var(--cam-gold-soft);
 }
 
 .cam-admin-intro-content {
@@ -114,16 +127,17 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  color: #e1c578;
+  color: var(--cam-gold-soft);
   font-size: 11px;
   letter-spacing: 1.8px;
   font-weight: 800;
 }
 
 .cam-admin-eyebrow span {
-  width: 17px;
+  width: 18px;
   height: 2px;
-  background: #e1c578;
+  border-radius: 2px;
+  background: var(--cam-gold);
 }
 
 .cam-admin-intro-content h1 {
@@ -136,14 +150,14 @@
 
 .cam-admin-intro-content h1 em {
   display: block;
-  color: #e6ce90;
+  color: var(--cam-gold-soft);
   font-style: normal;
 }
 
 .cam-admin-intro-content > p {
   max-width: 430px;
   margin: 0;
-  color: #c4d8cc;
+  color: #c8d7ee;
   font-size: 15px;
   line-height: 1.9;
 }
@@ -158,33 +172,33 @@
   display: flex;
   align-items: center;
   gap: 15px;
-  color: #f1f6f2;
+  color: #f1f5ff;
   font-size: 13px;
   font-weight: 600;
 }
 
 .cam-admin-feature-list svg {
-  color: #e4c77a;
+  color: var(--cam-gold-soft);
   flex-shrink: 0;
 }
 
 .cam-admin-intro-footer {
-  color: #aec5b7;
+  color: #aabfdd;
   font-size: 12px;
 }
 
-/* RIGHT PANEL */
+/* ======================= RIGHT PANEL ======================== */
 
 .cam-admin-login-form-panel {
   position: relative;
   min-height: 100vh;
   padding: 40px clamp(24px, 5.5vw, 94px);
-
   display: flex;
   align-items: center;
   justify-content: center;
-
-  background: #f9faf7;
+  background:
+    radial-gradient(circle at 90% 15%, rgba(47, 114, 203, 0.06), transparent 45%),
+    linear-gradient(180deg, #ffffff 0%, #f5f8fe 100%);
 }
 
 .cam-admin-login-form-container {
@@ -198,20 +212,20 @@
 }
 
 .cam-admin-login-lock {
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   margin-bottom: 24px;
-  border: 1px solid #cfe0d4;
-  border-radius: 16px;
-  background: #e8f4eb;
-  color: #0a6942;
-
+  border: 1px solid rgba(228, 173, 68, 0.58);
+  border-radius: 17px;
+  background: linear-gradient(145deg, #fffaf0, #eaf1fb);
+  color: var(--cam-blue);
   display: grid;
   place-items: center;
+  box-shadow: 0 9px 25px rgba(7, 30, 73, 0.08);
 }
 
 .cam-admin-login-kicker {
-  color: #b18d3c;
+  color: #a87517;
   font-size: 10px;
   letter-spacing: 1.6px;
   font-weight: 800;
@@ -219,7 +233,7 @@
 
 .cam-admin-login-header h2 {
   margin: 9px 0 10px;
-  color: #103d29;
+  color: var(--cam-navy);
   font-size: clamp(30px, 3.2vw, 40px);
   font-weight: 800;
   letter-spacing: -1px;
@@ -227,12 +241,12 @@
 
 .cam-admin-login-header p {
   margin: 0;
-  color: #6d7e72;
+  color: var(--cam-muted);
   font-size: 13px;
   line-height: 1.7;
 }
 
-/* FORM */
+/* =========================== FORM =========================== */
 
 .cam-admin-login-form {
   display: grid;
@@ -242,7 +256,7 @@
 .cam-admin-form-field > label {
   display: block;
   margin-bottom: 8px;
-  color: #304b39;
+  color: #233f68;
   font-size: 12px;
   font-weight: 700;
 }
@@ -252,88 +266,114 @@
   display: flex;
   align-items: center;
   gap: 11px;
-
   padding: 0 14px;
-  border: 1px solid #d5dfd5;
-  border-radius: 10px;
+  border: 1px solid var(--cam-border);
+  border-radius: 11px;
   background: #fff;
-  transition: border-color 0.18s, box-shadow 0.18s;
+  box-shadow: 0 2px 8px rgba(7, 30, 73, 0.025);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 .cam-admin-input-wrap:focus-within {
-  border-color: #16704a;
-  box-shadow: 0 0 0 3px #0c76511b;
+  border-color: var(--cam-blue);
+  box-shadow: 0 0 0 3px rgba(21, 75, 147, 0.12);
+  background: #fff;
 }
 
 .cam-admin-input-wrap > svg {
-  color: #829487;
+  color: #8194af;
   flex-shrink: 0;
+}
+
+.cam-admin-input-wrap:focus-within > svg {
+  color: var(--cam-blue);
 }
 
 .cam-admin-input-wrap input {
   width: 100%;
   min-width: 0;
   height: 51px;
-
-  border: 0;
-  outline: 0;
+  border: 0 !important;
+  outline: 0 !important;
   background: transparent;
-  color: #1b3526;
+  box-shadow: none !important;
+  color: var(--cam-ink);
+  font: 500 13px Inter, "Segoe UI", Arial, sans-serif;
+}
 
-  font: 500 13px Arial, sans-serif;
+.cam-admin-input-wrap input:focus {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
 }
 
 .cam-admin-input-wrap input::placeholder {
-  color: #99a59b;
+  color: #9cabbd;
 }
 
 .cam-admin-show-password {
   border: 0;
   padding: 5px;
-  color: #7b8a7e;
+  color: #7185a2;
   cursor: pointer;
   background: transparent;
   display: grid;
   place-items: center;
+  border-radius: 7px;
 }
 
-.cam-admin-show-password:hover {
-  color: #0a6740;
+.cam-admin-show-password:hover,
+.cam-admin-show-password:focus-visible {
+  color: var(--cam-blue);
+  background: #edf3fb;
 }
 
-/* SUBMIT */
+.cam-admin-show-password:focus-visible {
+  outline: 2px solid var(--cam-gold);
+  outline-offset: 2px;
+}
+
+/* ========================== SUBMIT ========================== */
 
 .cam-admin-login-submit {
   width: 100%;
   min-height: 53px;
   margin-top: 8px;
-
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 12px;
-
-  background: #08633f;
-  border: 1px solid #08633f;
-  border-radius: 10px;
+  background: linear-gradient(115deg, #154b93 0%, #071e49 85%);
+  border: 1px solid #d9a445;
+  border-radius: 11px;
   color: #fff;
-  font: 700 13px Arial, sans-serif;
+  font: 800 13px Inter, "Segoe UI", Arial, sans-serif;
   cursor: pointer;
+  box-shadow: 0 12px 24px rgba(7, 30, 73, 0.16);
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
 }
 
 .cam-admin-login-submit:not(:disabled):hover {
-  background: #034e30;
+  filter: brightness(1.10);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 28px rgba(7, 30, 73, 0.24);
+}
+
+.cam-admin-login-submit:focus-visible {
+  outline: 3px solid rgba(228, 173, 68, 0.58);
+  outline-offset: 3px;
 }
 
 .cam-admin-login-submit:disabled {
   opacity: 0.65;
   cursor: wait;
+  box-shadow: none;
 }
 
 .cam-admin-login-error {
   padding: 12px 13px;
   border: 1px solid #f0c8c4;
-  border-radius: 8px;
+  border-radius: 9px;
   background: #fff0ef;
   color: #9e312c;
   font-size: 12px;
@@ -341,7 +381,7 @@
 }
 
 .cam-admin-password-help {
-  color: #819087;
+  color: #7588a3;
   font-size: 11px;
   line-height: 1.6;
   margin: 0;
@@ -353,13 +393,11 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-
   margin-top: 30px;
   padding-top: 20px;
-  border-top: 1px solid #e4eae4;
-
+  border-top: 1px solid #e1e8f3;
   font-size: 11px;
-  color: #89978c;
+  color: #8090a7;
 }
 
 .cam-admin-login-copyright {
@@ -367,12 +405,13 @@
   bottom: 22px;
   left: 0;
   width: 100%;
+  padding: 0 20px;
   text-align: center;
   font-size: 10px;
-  color: #a0afa3;
+  color: #95a3b6;
 }
 
-/* RESPONSIVE */
+/* ======================== RESPONSIVE ======================== */
 
 @media (max-width: 960px) {
   .cam-admin-login-layout {
@@ -391,7 +430,7 @@
 
   .cam-admin-login-form-panel {
     min-height: calc(100vh - 102px);
-    padding: 25px 22px 60px;
+    padding: 25px 22px 65px;
   }
 
   .cam-admin-login-form-container {
@@ -410,5 +449,16 @@
 
   .cam-admin-login-header {
     margin-bottom: 24px;
+  }
+
+  .cam-admin-login-form-panel {
+    padding-inline: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cam-admin-login-submit,
+  .cam-admin-input-wrap {
+    transition: none;
   }
 }

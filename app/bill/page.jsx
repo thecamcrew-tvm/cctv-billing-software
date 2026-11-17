@@ -1,16 +1,21 @@
-
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronUp,
   Pencil,
+  Plus,
   Printer,
   Save,
+  Search,
   Trash2,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { productPurchasePrice, maxAllowedLineDiscount, lineDiscountError, isServiceProduct } from "@/lib/billingDiscountLimit";
 import "./bill.css";
+import "./bill-split-edit.css";
 
 const STORAGE_KEY = "cam-crew-billing-v1";
 const LATEST_KEY = "cam-crew-latest-invoice";
@@ -90,6 +95,17 @@ function money(number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+// Show a discount as a percentage of the pre-GST gross amount.
+// Four decimal places prevent a surprise change on mode switching.
+function discountPercent(amount, gross) {
+  const base = Math.max(0, numeric(gross));
+  return base > 0 ? Number(((numeric(amount) / base) * 100).toFixed(4)) : 0;
+}
+
+function lineGrossAmount(line) {
+  return round2(Math.max(0, numeric(line?.quantity)) * Math.max(0, numeric(line?.rate)));
 }
 
 function formatDate(value) {
@@ -208,129 +224,88 @@ function DetailRow({ label, children }) {
   );
 }
 
-/**
- * Product picker for Bill Edit.
- * Reads the same local catalogue schema as Admin Products:
- * { id, number, name, price, hsnSac, gst, stock, category }.
- * This component lives in this file so no extra component import is needed.
- */
-function ProductCatalogSearch({ products = [], onSelect }) {
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
 
+// Product stock is read from the existing Admin Products catalogue.
+// Missing stock values and Services are not treated as out-of-stock.
+// This warning is visual only; it does not decrement stock or block billing.
+function productStockWarning(product, quantity = 1) {
+  if (!product || String(product.category || "").trim().toLowerCase().startsWith("service")) return null;
+  const rawStock = product.stock;
+  if (rawStock === null || rawStock === undefined || String(rawStock).trim() === "") return null;
+  const available = Number(rawStock);
+  if (!Number.isFinite(available) || available < 0) return null;
+  if (available === 0) return "Out of Stock";
+  if (Number(quantity) > available) return `Only ${available} in stock`;
+  return null;
+}
+
+function ProductCatalogSearch({ products, onAdd }) {
+  const [query, setQuery] = useState("");
+  const [showMatches, setShowMatches] = useState(false);
   const matches = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return products.filter((product) =>
-      String(product.status ?? "active").toLowerCase() !== "inactive"
-    ).slice(0, 10);
-
     return products
       .filter((product) => String(product.status ?? "active").toLowerCase() !== "inactive")
-      .filter((product) => [
-        product.number,
-        product.productNumber,
-        product.code,
-        product.name,
-        product.productName,
-        product.hsnSac,
-        product.hsn,
-        product.category,
-      ].some((value) => String(value ?? "").toLowerCase().includes(term)))
-      .slice(0, 15);
+      .filter((product) => !term || [
+        product.number, product.productNumber, product.name,
+        product.productName, product.hsnSac, product.category,
+      ].some((part) => String(part ?? "").toLowerCase().includes(term)))
+      .slice(0, 12);
   }, [products, query]);
 
   return (
-    <div className="gst-catalog-picker no-print" style={{ position: "relative", marginBottom: 14 }}>
-      <label htmlFor="bill-product-search" style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
-        Add product by number or name
-      </label>
-      <input
-        id="bill-product-search"
-        type="search"
-        autoComplete="off"
-        className="gst-field"
-        style={{ width: "100%" }}
-        placeholder="Search product number, name or HSN/SAC"
-        value={query}
-        onFocus={() => setOpen(true)}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") setOpen(false);
-        }}
-        aria-expanded={open}
-        aria-controls="bill-product-search-results"
-      />
-      <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-        {products.length} product{products.length === 1 ? "" : "s"} in catalogue
+    <div className="gst-compact-catalog-search">
+      <label htmlFor="gst-compact-product-search"><Plus size={16} /> Add Product from Catalogue</label>
+      <div className="gst-compact-catalog-input">
+        <Search size={17} aria-hidden="true" />
+        <input
+          id="gst-compact-product-search"
+          className="gst-field"
+          type="search"
+          autoComplete="off"
+          placeholder="Search product number or name..."
+          value={query}
+          onChange={(event) => { setQuery(event.target.value); setShowMatches(true); }}
+          onFocus={() => setShowMatches(true)}
+          onKeyDown={(event) => { if (event.key === "Escape") setShowMatches(false); }}
+          aria-expanded={showMatches}
+          aria-controls="gst-compact-product-results"
+        />
       </div>
-      {open && (
-        <div
-          id="bill-product-search-results"
-          role="listbox"
-          style={{
-            position: "absolute",
-            zIndex: 60,
-            top: "100%",
-            left: 0,
-            right: 0,
-            backgroundColor: "#fff",
-            color: "#111827",
-            border: "1px solid #cbd5e1",
-            borderRadius: 8,
-            maxHeight: 300,
-            overflowY: "auto",
-            boxShadow: "0 12px 24px rgba(0,0,0,.14)",
-          }}
-        >
-          {products.length === 0 ? (
-            <div style={{ padding: 12 }}>
-              No products in the catalogue. Add products in Admin → Products first.
-            </div>
-          ) : matches.length === 0 ? (
-            <div style={{ padding: 12 }}>No matching products found.</div>
-          ) : matches.map((product, index) => {
-            const code = String(product.number ?? product.productNumber ?? product.code ?? "");
-            const name = String(product.name ?? product.productName ?? "Unnamed Product");
-            const price = Number(product.price ?? product.sellingPrice ?? product.rate ?? 0);
+      {showMatches && (
+        <div id="gst-compact-product-results" className="gst-compact-catalog-results">
+          {matches.length ? matches.map((product, index) => {
+            const number = String(product.number ?? product.productNumber ?? product.code ?? "");
+            const name = String(product.name ?? product.productName ?? "Unnamed product");
+            const hasSalePrice = product.salePrice !== null && product.salePrice !== undefined && product.salePrice !== "";
+            const rate = numeric(hasSalePrice ? product.salePrice : (product.price ?? product.rate ?? 0));
+            const stockWarning = productStockWarning(product);
             return (
               <button
                 type="button"
-                role="option"
-                aria-selected={false}
-                key={`${product.id ?? code}-${index}`}
+                className={`gst-compact-catalog-option${stockWarning ? " gst-stock-warning-option" : ""}`}
+                title={stockWarning ? `${name}: ${stockWarning}` : undefined}
+                key={`${product.id ?? number}-${index}`}
                 onClick={() => {
-                  onSelect?.(product);
-                  setQuery("");
-                  setOpen(false);
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  width: "100%",
-                  padding: "11px 12px",
-                  borderBottom: "1px solid #e5e7eb",
-                  textAlign: "left",
-                  cursor: "pointer",
+                  if (onAdd(product)) {
+                    setQuery("");
+                    setShowMatches(false);
+                  }
                 }}
               >
-                <span style={{ minWidth: 0 }}>
-                  <strong style={{ display: "block", fontSize: 12, color: "#075c3b" }}>{code}</strong>
-                  <span style={{ display: "block", fontSize: 13 }}>{name}</span>
-                  {product.hsnSac && (
-                    <small style={{ color: "#64748b" }}>HSN/SAC: {product.hsnSac}</small>
-                  )}
+                <span>
+                  <strong>{number || "No product number"}</strong>
+                  <small>{name}</small>
+                  {stockWarning && <small className="gst-stock-warning-text">{stockWarning}</small>}
                 </span>
-                <strong style={{ whiteSpace: "nowrap" }}>
-                  ₹{Number.isFinite(price) ? price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
-                </strong>
+                <b>₹{money(rate)}</b>
               </button>
             );
-          })}
+          }) : (
+            <p className="gst-compact-catalog-empty">
+              {products.length ? "No matching products." : "No products saved. Add products in Admin → Products first."}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -342,11 +317,19 @@ export default function BillPage() {
   const [lines, setLines] = useState(sampleLines);
   const [customers, setCustomers] = useState([]);
   const [editing, setEditing] = useState(false);
+  const [billToCollapsed, setBillToCollapsed] = useState(true);
+  const [productsCollapsed, setProductsCollapsed] = useState(true);
+  // A missing key means minimized: existing and newly added products start compact.
+  const [expandedProducts, setExpandedProducts] = useState({});
+  const [productCatalog, setProductCatalog] = useState([]);
+  // Drafts preserve what is being typed in the focused amount or % input.
+  // The other field always reflects the saved numeric discount.
+  const [totalDiscountDraft, setTotalDiscountDraft] = useState(null);
+  const [lineDiscountDrafts, setLineDiscountDrafts] = useState({});
+  const [discountError, setDiscountError] = useState("");
+  const editBackupRef = useRef(null);
   const [message, setMessage] = useState("");
   const [loadedInvoiceId, setLoadedInvoiceId] = useState(null);
-  const [adjustment, setAdjustment] = useState(0.51);
-  const [roundToRupee, setRoundToRupee] = useState(true);
-  const [productCatalog, setProductCatalog] = useState([]);
   // Payment fields come from the saved invoice. The bill page does not collect payments.
   const [paymentInfo, setPaymentInfo] = useState({
     status: "Pending",
@@ -415,6 +398,8 @@ export default function BillPage() {
         hsnSac: item.hsnSac || "",
         quantity: numeric(item.qty),
         rate: numeric(item.price),
+        purchasePrice: item.purchasePrice ?? null,
+        isService: Boolean(item.isService),
         discount: numeric(item.discount),
         gst: numeric(item.gst),
       }));
@@ -487,24 +472,33 @@ export default function BillPage() {
         declaration: billMetadata.declaration || old.declaration,
       }));
 
-      const calculatedTotal = amountsFromItems(savedLines.map((item) => ({
-        qty: item.quantity,
-        price: item.rate,
-        discount: item.discount,
-        gst: item.gst,
-      })), supplyType);
-      // Some demo/legacy invoices have totals different from their saved line items.
-      // Preserve that difference transparently instead of silently changing the invoice.
-      if (Number.isFinite(Number(billMetadata.adjustment)) && billMetadata.adjustment != null) {
-        setAdjustment(round2(numeric(billMetadata.adjustment)));
-        setRoundToRupee(Boolean(billMetadata.roundToRupee));
-      } else {
-        setAdjustment(round2(numeric(invoice.total) - calculatedTotal));
-      }
     } catch (error) {
       console.error("Unable to load invoice", error);
       setMessage("Invoice data could not be loaded. Check your browser storage.");
     }
+  }, []);
+
+
+  useEffect(() => {
+    const loadCatalog = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        setProductCatalog(Array.isArray(stored.products) ? stored.products : []);
+      } catch (error) {
+        console.error("Unable to load product catalogue:", error);
+        setProductCatalog([]);
+      }
+    };
+    loadCatalog();
+    window.addEventListener("focus", loadCatalog);
+    window.addEventListener("storage", loadCatalog);
+    const onVisibility = () => { if (!document.hidden) loadCatalog(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", loadCatalog);
+      window.removeEventListener("storage", loadCatalog);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   function updateDetail(key, value) {
@@ -529,88 +523,121 @@ export default function BillPage() {
     }));
   }
 
+  function catalogForLine(line) {
+    const code = String(line?.productNumber ?? "").trim().toLowerCase();
+    return productCatalog.find((product) => String(product.number ?? product.productNumber ?? product.code ?? "").trim().toLowerCase() === code);
+  }
+
+  function maxLineDiscount(line) {
+    return maxAllowedLineDiscount(line, catalogForLine(line));
+  }
+
   function updateLine(id, field, value) {
-    setLines((old) => old.map((line) => line.id === id ? { ...line, [field]: value } : line));
-    setAdjustment(0);
-  }
-
-  function removeLine(id) {
-    setLines((old) => old.filter((line) => line.id !== id));
-    setAdjustment(0);
-  }
-const addCatalogProduct = (product) => {
-    if (!product) return;
-
-    // Admin catalogue uses number / name / price / gst.
-    const productNumber = String(product.number ?? product.productNumber ?? product.code ?? "");
-    const description = String(product.name ?? product.productName ?? product.description ?? "");
-    const hsnSac = String(product.hsnSac ?? product.hsn ?? "");
-    const rate = numeric(product.price ?? product.sellingPrice ?? product.rate ?? 0);
-    const gst = numeric(product.gst ?? product.gstPercentage ?? 0);
-    const discount = numeric(product.discount ?? 0);
-
-    if (!productNumber || !description) {
-      setMessage("Selected product is missing its product number or name.");
-      return;
+    const line = lines.find((entry) => entry.id === id);
+    if (!line) return;
+    const next = { ...line, [field]: value };
+    const maximum = maxLineDiscount(next);
+    if (field === "discount" && Number(value) > maximum) {
+      next.discount = maximum;
+      setMessage(`Maximum discount for ${line.description} is ₹${money(maximum)}; selling price cannot fall below purchase price.`);
+    } else if ((field === "quantity" || field === "rate") && Number(next.discount) > maximum) {
+      next.discount = maximum;
+      setMessage(`Discount adjusted to ₹${money(maximum)} following the quantity or rate change.`);
+    } else {
+      setMessage("");
     }
+    setLines((old) => old.map((entry) => entry.id === id ? next : entry));
+    // Quantity changes can change the gross amount and therefore the percentage.
+    setLineDiscountDrafts((previous) => {
+      if (!previous[id]) return previous;
+      const updated = { ...previous };
+      delete updated[id];
+      return updated;
+    });
+    setTotalDiscountDraft(null);
+    setDiscountError("");
+  }
 
-    setLines((previous) => {
-      // Same product selected again: increase quantity rather than adding
-      // an identical second row. Existing saved rows remain editable.
-      const existing = previous.find((line) =>
-        String(line.productNumber).toLowerCase() === productNumber.toLowerCase()
-      );
-      if (existing) {
-        return previous.map((line) => line.id === existing.id
-          ? { ...line, quantity: numeric(line.quantity) + 1 }
-          : line);
-      }
-      return [...previous, {
-        id: `catalog-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+  function addCatalogProduct(product) {
+    if (!product) return false;
+    const productNumber = String(product.number ?? product.productNumber ?? product.code ?? "").trim();
+    const description = String(product.name ?? product.productName ?? product.description ?? "").trim();
+    if (!productNumber || !description) {
+      setMessage("Selected product needs a product number and name. Update it in Admin → Products.");
+      return false;
+    }
+    const hasSalePrice = product.salePrice !== null && product.salePrice !== undefined && product.salePrice !== "";
+    const rate = numeric(hasSalePrice ? product.salePrice : (product.price ?? product.sellingPrice ?? product.rate ?? 0));
+    const existing = lines.find((line) =>
+      String(line.productNumber).trim().toLowerCase() === productNumber.toLowerCase()
+    );
+    if (existing) {
+      // Selecting the same catalogue item again increases its quantity by one.
+      setLines((previous) => previous.map((line) =>
+        line.id === existing.id ? { ...line, quantity: numeric(line.quantity) + 1 } : line
+      ));
+      setExpandedProducts((previous) => ({ ...previous, [existing.id]: false }));
+      setLineDiscountDrafts((previous) => {
+        const updated = { ...previous };
+        delete updated[existing.id];
+        return updated;
+      });
+    } else {
+      const id = `catalog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setLines((previous) => [...previous, {
+        id,
         productNumber,
         description,
-        hsnSac,
+        hsnSac: String(product.hsnSac ?? product.hsn ?? ""),
         quantity: 1,
         rate,
-        discount,
-        gst,
-      }];
-    });
-    setAdjustment(0);
-    setMessage("");
-  };
-useEffect(() => {
-    // IMPORTANT: The existing Admin Products page uses useStore() and saves
-    // products inside localStorage under cam-crew-billing-v1.
-    // Loading Firestore billingProducts here previously returned no matches.
-    const loadProducts = () => {
-      try {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-        setProductCatalog(Array.isArray(stored.products) ? stored.products : []);
-      } catch (error) {
-        console.error("Failed to load Admin product catalogue:", error);
-        setProductCatalog([]);
-      }
-    };
+        purchasePrice: productPurchasePrice(product),
+        isService: isServiceProduct(product),
+        discount: 0,
+        gst: numeric(product.gst ?? product.gstPercentage ?? 0),
+      }]);
+      // The new row is minimized and shows only number + name.
+      setExpandedProducts((previous) => ({ ...previous, [id]: false }));
+    }
+    setTotalDiscountDraft(null);
+    setDiscountError("");
+    setProductsCollapsed(false);
+    const stockWarning = productStockWarning(product, existing ? numeric(existing.quantity) + 1 : 1);
+    setMessage(stockWarning ? `${description}: ${stockWarning}. Highlighted in red.` : "");
+    return true;
+  }
 
-    loadProducts();
-    // Refresh when returning from the Admin Products page or when another
-    // browser tab updates the store.
-    window.addEventListener("focus", loadProducts);
-    window.addEventListener("storage", loadProducts);
-    return () => {
-      window.removeEventListener("focus", loadProducts);
-      window.removeEventListener("storage", loadProducts);
-    };
-  }, []);
+  function stockWarningForLine(line) {
+    const code = String(line.productNumber ?? "").trim().toLowerCase();
+    if (!code) return null;
+    const product = productCatalog.find((entry) =>
+      String(entry.number ?? entry.productNumber ?? entry.code ?? "").trim().toLowerCase() === code
+    );
+    return productStockWarning(product, line.quantity);
+  }
+
+  function removeProduct(id) {
+    setLines((previous) => previous.filter((line) => line.id !== id));
+    setLineDiscountDrafts((previous) => {
+      const updated = { ...previous };
+      delete updated[id];
+      return updated;
+    });
+    setExpandedProducts((previous) => {
+      const next = { ...previous };
+      delete next[id];
+      return next;
+    });
+    setTotalDiscountDraft(null);
+    setDiscountError("");
+  }
+
   const totals = useMemo(() => {
     const entries = lines.map((line) => calculateRow(line, details.supplyType));
     const sum = (key) => round2(entries.reduce((acc, row) => acc + numeric(row[key]), 0));
     const taxable = sum("taxable");
     const tax = sum("tax");
-    const beforeRoundOff = round2(taxable + tax + numeric(adjustment));
-    const roundOff = roundToRupee ? round2(Math.round(beforeRoundOff) - beforeRoundOff) : 0;
-    const grandTotal = round2(beforeRoundOff + roundOff);
+    const grandTotal = round2(taxable + tax);
 
     const groups = new Map();
     for (const row of entries) {
@@ -642,12 +669,10 @@ useEffect(() => {
       sgst: sum("sgst"),
       igst: sum("igst"),
       tax,
-      adjustment: round2(numeric(adjustment)),
-      roundOff,
       grandTotal,
       groups: [...groups.values()],
     };
-  }, [lines, details.supplyType, adjustment, roundToRupee]);
+  }, [lines, details.supplyType]);
 
   // The QR embeds a compact, readable payment summary so a normal phone QR
   // scanner can display the information without fetching browser-local data.
@@ -701,8 +726,6 @@ useEffect(() => {
       `CGST: INR ${money(totals.cgst)}`,
       `SGST: INR ${money(totals.sgst)}`,
       `IGST: INR ${money(totals.igst)}`,
-      ...(totals.adjustment ? [`Adjustment: INR ${money(totals.adjustment)}`] : []),
-      ...(totals.roundOff ? [`Round Off: INR ${money(totals.roundOff)}`] : []),
       `Grand Total: INR ${money(totals.grandTotal)}`,
       `Amount Paid: ${amountText(paidAmount)}`,
       `Balance Due: ${amountText(balanceDue)}`,
@@ -719,7 +742,128 @@ useEffect(() => {
     return detailsText.join("\n");
   }, [details, paymentInfo, totals, loadedInvoiceId]);
 
+  // Two linked inputs: Amount (₹) and Percentage (%) always show together.
+  // Percentage is computed from the gross amount BEFORE GST.
+  // Apply the total discount in paise across products without breaching any
+  // product's purchase-cost floor.
+  function changeTotalDiscount(rawValue, field) {
+    setTotalDiscountDraft({ field, value: rawValue });
+
+    if (rawValue === "") {
+      setLines((previous) => previous.map((line) => ({ ...line, discount: 0 })));
+      setDiscountError("");
+      return;
+    }
+
+    const requested = Number(rawValue);
+    const limitPaise = lines.map((line) => Math.round(maxLineDiscount(line) * 100));
+    const totalLimitPaise = limitPaise.reduce((sum, amount) => sum + amount, 0);
+    const gross = totals.gross;
+    const maximumPercent = discountPercent(totalLimitPaise / 100, gross);
+    const requestedAmount = field === "percentage" ? gross * requested / 100 : requested;
+    const requestedPaise = Math.round(requestedAmount * 100);
+
+    if (
+      !Number.isFinite(requested) || requested < 0 ||
+      (field === "percentage" && (requested > 100 || (gross <= 0 && requested > 0))) ||
+      !Number.isFinite(requestedPaise) || requestedPaise > totalLimitPaise
+    ) {
+      setDiscountError(
+        `Maximum allowed invoice discount: ₹${money(totalLimitPaise / 100)} ` +
+        `(${maximumPercent}% of the pre-GST amount). ` +
+        "Discount cannot reduce any product below its purchase cost."
+      );
+      return; // Keep the previously applied discount until a valid value is entered.
+    }
+    setDiscountError("");
+
+    if (totalLimitPaise === 0) {
+      setLines((previous) => previous.map((line) => ({ ...line, discount: 0 })));
+      return;
+    }
+
+    // Distribute proportionally based on available cost-safe discount capacity.
+    // Largest-remainder rounding makes the allocated paise equal the exact total.
+    const ideal = limitPaise.map((capacity) => requestedPaise * capacity / totalLimitPaise);
+    const shares = ideal.map(Math.floor);
+    let remainder = requestedPaise - shares.reduce((sum, amount) => sum + amount, 0);
+    const priority = ideal
+      .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+      .sort((a, b) => b.fraction - a.fraction);
+    for (const { index } of priority) {
+      if (remainder <= 0) break;
+      if (shares[index] < limitPaise[index]) {
+        shares[index] += 1;
+        remainder--;
+      }
+    }
+
+    setLines((previous) => previous.map((line, index) => ({
+      ...line,
+      discount: (shares[index] || 0) / 100,
+    })));
+    setLineDiscountDrafts({}); // A total discount updates all product discount inputs.
+  }
+
+  function changeLineDiscount(line, rawValue, field) {
+    const gross = lineGrossAmount(line);
+    const requested = rawValue === "" ? 0 : Number(rawValue);
+    const converted = field === "percentage" ? gross * requested / 100 : requested;
+    const amount = round2(converted);
+    const maximum = maxLineDiscount(line);
+
+    if (!Number.isFinite(requested) || requested < 0 ||
+        (field === "percentage" && requested > 100) ||
+        !Number.isFinite(amount)) {
+      setMessage("Enter a valid non-negative discount percentage (0–100) or amount.");
+      return;
+    }
+
+    // Existing updateLine clamps excessive discounts to their purchase-cost floor.
+    updateLine(line.id, "discount", amount);
+    if (amount <= maximum) {
+      // Preserve decimals/empty values during typing without breaking linkage.
+      setLineDiscountDrafts((previous) => ({
+        ...previous,
+        [line.id]: { field, value: rawValue },
+      }));
+    }
+  }
+
+  // Edit only Bill To and product rows; all other invoice fields stay read-only.
+  function startSimpleEdit() {
+    editBackupRef.current = {
+      details: { ...details },
+      lines: lines.map((line) => ({ ...line })),
+    };
+    setMessage("");
+    setBillToCollapsed(true);
+    setProductsCollapsed(true);
+    setExpandedProducts({});
+    setTotalDiscountDraft(null);
+    setLineDiscountDrafts({});
+    setDiscountError("");
+    setEditing(true);
+  }
+
+  function cancelSimpleEdit() {
+    const snapshot = editBackupRef.current;
+    if (snapshot) {
+      setDetails(snapshot.details);
+      setLines(snapshot.lines);
+    }
+    editBackupRef.current = null;
+    setEditing(false);
+    setTotalDiscountDraft(null);
+    setDiscountError("");
+    setMessage("");
+  }
+
   function saveChanges() {
+    if (discountError) {
+      setMessage(discountError);
+      return;
+    }
     if (!loadedInvoiceId) {
       setMessage("Create an invoice from Dashboard → New Invoice before saving here.");
       return;
@@ -728,13 +872,18 @@ useEffect(() => {
       setMessage("Enter the consignee/customer name before saving.");
       return;
     }
-    if (!lines.length || lines.some((line) =>
-      !String(line.description || "").trim() || numeric(line.quantity) <= 0 ||
-      numeric(line.rate) < 0 || numeric(line.discount) < 0 ||
-      numeric(line.discount) > numeric(line.quantity) * numeric(line.rate) ||
-      numeric(line.gst) < 0 || numeric(line.gst) > 100
-    )) {
-      setMessage("Enter valid product descriptions, quantities, rates, discounts and GST rates.");
+    if (!lines.length || lines.some((line) => {
+      const quantity = Number(line.quantity);
+      const rate = Number(line.rate);
+      const discount = Number(line.discount);
+      const gst = Number(line.gst);
+      return !String(line.description || "").trim() ||
+        !Number.isFinite(quantity) || quantity <= 0 ||
+        !Number.isFinite(rate) || rate < 0 ||
+        Boolean(lineDiscountError(line, catalogForLine(line))) ||
+        !Number.isFinite(gst) || gst < 0 || gst > 100;
+    })) {
+      setMessage("Invalid discount: a product cannot be sold below its purchase price. Set Purchase Price in Products & Services if needed.");
       return;
     }
     try {
@@ -745,33 +894,26 @@ useEffect(() => {
         setMessage("The invoice was not found in localStorage; it was not overwritten.");
         return;
       }
-      const id = String(details.invoiceNumber || "").trim();
-      if (!id) {
-        setMessage("Invoice number is required.");
-        return;
-      }
-      if (id !== loadedInvoiceId && invoices.some((invoice) => invoice.id === id)) {
-        setMessage("Another invoice already uses that invoice number.");
-        return;
-      }
+      // Retain invoice ID, date, seller details, bank settings, payment and GST type.
       const updated = {
         ...original,
-        id,
-        date: details.invoiceDate,
         customerId: details.customerId,
-        customerName: details.customerName,
+        customerName: details.customerName.trim(),
         total: totals.grandTotal,
         items: lines.map((line) => ({
-          number: line.productNumber,
-          name: line.description,
-          hsnSac: line.hsnSac,
+          number: String(line.productNumber || "").trim(),
+          name: String(line.description || "").trim(),
+          hsnSac: String(line.hsnSac || "").trim(),
           qty: numeric(line.quantity),
           price: numeric(line.rate),
+          purchasePrice: line.purchasePrice ?? productPurchasePrice(catalogForLine(line)),
+          isService: Boolean(line.isService || isServiceProduct(catalogForLine(line))),
           discount: numeric(line.discount),
           gst: numeric(line.gst),
         })),
         customerSnapshot: {
-          customerName: details.customerName,
+          ...original.customerSnapshot,
+          customerName: details.customerName.trim(),
           customerCompany: details.customerCompany,
           customerAddress: details.customerAddress,
           customerCity: details.customerCity,
@@ -781,22 +923,12 @@ useEffect(() => {
           customerEmail: details.customerEmail,
           customerGstin: details.customerGstin,
         },
-        bankDetails: {
-          bankAccountName: details.bankAccountName,
-          bankName: details.bankName,
-          bankAccountNumber: details.bankAccountNumber,
-          bankIfsc: details.bankIfsc,
-          bankBranch: details.bankBranch,
-          bankUpiId: details.bankUpiId,
-        },
         billMetadata: {
-          ...Object.fromEntries([
-            "sellerName", "sellerSubtitle", "sellerAddress", "sellerPhone", "sellerEmail",
-            "sellerGstin", "terms", "placeOfSupply", "supplyType", "irn", "ackNo",
-            "ackDate", "ewayNo", "qrImage", "declaration",
-          ].map((field) => [field, details[field]])),
-          adjustment: totals.adjustment,
-          roundToRupee,
+          ...original.billMetadata,
+          placeOfSupply: details.placeOfSupply,
+          adjustment: 0,
+          roundToRupee: false,
+          manualRoundOff: null,
         },
       };
       const updatedData = {
@@ -805,10 +937,11 @@ useEffect(() => {
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedData));
       sessionStorage.setItem(LATEST_KEY, JSON.stringify(updated));
-      setLoadedInvoiceId(id);
-      window.history.replaceState(null, "", `/bill?invoice=${encodeURIComponent(id)}`);
-      setMessage("Invoice changes saved to this browser.");
+      setMessage("Bill To, products and discounts saved successfully.");
+      editBackupRef.current = null;
       setEditing(false);
+      setTotalDiscountDraft(null);
+      setDiscountError("");
     } catch (error) {
       console.error("Invoice save failed", error);
       setMessage("Could not save invoice. Check browser storage availability.");
@@ -817,7 +950,7 @@ useEffect(() => {
 
   const input = (field, label, options = {}) => (
     <FieldValue
-      editing={editing}
+      editing={false}
       value={details[field]}
       onChange={(value) => updateDetail(field, value)}
       placeholder={label}
@@ -826,31 +959,44 @@ useEffect(() => {
   );
 
   return (
-    <div className="gst-invoice-app">
+    <div className={`gst-invoice-app${editing ? " gst-split-edit-mode" : ""}`}>
       <div className="gst-toolbar no-print">
         <div className="gst-toolbar-heading">
           <strong>The Cam Crew_TVM</strong>
           <span>Classic black &amp; white A4 tax invoice</span>
         </div>
-        <div className="gst-toolbar-actions">
-          <button type="button" className="gst-btn gst-btn-outline" onClick={() => window.location.assign("/admin/dashboard")}>
-            <ArrowLeft size={15} /> Dashboard
-          </button>
-          <button type="button" className="gst-btn gst-btn-outline" onClick={() => setEditing((old) => !old)}>
-            <Pencil size={15} /> {editing ? "Done Editing" : "Edit Invoice"}
-          </button>
-          {editing && loadedInvoiceId && (
-            <button type="button" className="gst-btn gst-btn-outline" onClick={saveChanges}>
-              <Save size={15} /> Save Changes
+        
+<div className="gst-toolbar-actions">
+  <button
+    type="button"
+    className="gst-btn gst-btn-outline"
+    onClick={() =>
+      window.location.assign("/admin/dashboard?fromLogin=1")
+    }
+  >
+    <ArrowLeft size={15} /> Dashboard
+  </button>
+
+          {!editing ? (
+            <button type="button" className="gst-btn gst-btn-outline" onClick={startSimpleEdit}>
+              <Pencil size={15} /> Edit Bill
             </button>
+          ) : (
+            <>
+              <button type="button" className="gst-btn gst-btn-outline" onClick={cancelSimpleEdit}>
+                Cancel
+              </button>
+              <button type="button" className="gst-btn gst-btn-outline" onClick={saveChanges} disabled={!loadedInvoiceId || Boolean(discountError)}>
+                <Save size={15} /> Save Changes
+              </button>
+            </>
           )}
-          <button type="button" className="gst-btn gst-btn-primary" onClick={() => window.print()}>
+          <button type="button" className="gst-btn gst-btn-primary" onClick={() => window.print()}
+            disabled={editing} title={editing ? "Save or cancel before printing" : "Print the invoice"}>
             <Printer size={15} /> Print / Save PDF
           </button>
         </div>
-      </div>
-
-      {!loadedInvoiceId && !message && (
+        {!loadedInvoiceId && !message && (
         <div className="gst-demo-note no-print">Sample invoice shown for layout preview only. Product details and prices are examples, not official tax records.</div>
       )}
 
@@ -860,51 +1006,335 @@ useEffect(() => {
           <button type="button" onClick={() => setMessage("")} aria-label="Dismiss message">×</button>
         </div>
       )}
+      </div>
 
+      
+
+      <div className={`gst-bill-workspace${editing ? " is-editing" : ""}`}>
       {editing && (
-        <div className="gst-editor no-print">
-          <div className="gst-editor-control">
-            <label htmlFor="gst-existing-customer">Existing customer</label>
-            <select
-              id="gst-existing-customer"
-              className="gst-field"
-              value={customers.some((customer) => String(customer.id) === details.customerId) ? details.customerId : ""}
-              onChange={(event) => chooseCustomer(event.target.value)}
-            >
-              <option value="">Manual customer details</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>{customer.name} — {customer.phone || customer.id}</option>
+        <section className="gst-simple-editor no-print" aria-label="Invoice editing form">
+          <div className="gst-simple-editor-heading">
+            <div>
+              <span className="gst-simple-editor-kicker">EASY INVOICE EDITOR</span>
+              <h2>Edit Invoice</h2>
+              <p>Edit Bill To, add products and adjust discounts. The bill updates on the right.</p>
+            </div>
+          </div>
+
+          <div className="gst-simple-editor-panel gst-simple-billto-panel">
+            <div className="gst-simple-editor-panel-head gst-simple-billto-head">
+              <span className="gst-simple-editor-step">01</span>
+              <div className="gst-simple-panel-title">
+                <h3>CONSIGNEE / BILL TO</h3>
+                <p>{billToCollapsed ? "Customer details hidden — click Expand to edit." : "Choose a customer or edit the invoice contact details."}</p>
+              </div>
+              <button
+                type="button"
+                className="gst-simple-collapse-btn"
+                onClick={() => setBillToCollapsed((previous) => !previous)}
+                aria-expanded={!billToCollapsed}
+                aria-controls="gst-billto-edit-fields"
+                title={billToCollapsed ? "Expand Bill To details" : "Minimize Bill To details"}
+              >
+                {billToCollapsed ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
+                <span>{billToCollapsed ? "Expand" : "Minimize"}</span>
+              </button>
+            </div>
+            {billToCollapsed && (
+              <div className="gst-simple-billto-summary">
+                <strong>{details.customerName?.trim() || "No customer name entered"}</strong>
+                <span>{[details.customerPhone, details.customerCity, details.customerState].filter(Boolean).join(" · ") || "Expand to enter customer information"}</span>
+              </div>
+            )}
+            <div id="gst-billto-edit-fields" hidden={billToCollapsed}>
+            <div className="gst-simple-customer-select">
+              <label htmlFor="gst-existing-customer">Select Existing Customer</label>
+              <select
+                id="gst-existing-customer"
+                className="gst-field"
+                value={customers.some((customer) => String(customer.id) === String(details.customerId)) ? details.customerId : ""}
+                onChange={(event) => {
+                  if (event.target.value) chooseCustomer(event.target.value);
+                  else updateDetail("customerId", "");
+                }}
+              >
+                <option value="">Manual customer details</option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} — {customer.phone || customer.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="gst-simple-fields">
+              {[
+                ["customerName", "Customer Name *"],
+                ["customerCompany", "Company"],
+                ["customerPhone", "Phone"],
+                ["customerEmail", "Email"],
+                ["customerCity", "City"],
+                ["customerState", "State"],
+                ["customerPin", "PIN Code"],
+                ["customerGstin", "GSTIN"],
+                ["placeOfSupply", "Place of Supply"],
+              ].map(([key, label]) => (
+                <label key={key} className="gst-simple-field">
+                  <span>{label}</span>
+                  <input
+                    className="gst-field"
+                    value={details[key] ?? ""}
+                    onChange={(event) => updateDetail(key, event.target.value)}
+                    required={key === "customerName"}
+                    type={key === "customerEmail" ? "email" : key === "customerPhone" ? "tel" : "text"}
+                    placeholder={label.replace(" *", "")}
+                  />
+                </label>
               ))}
-            </select>
+              <label className="gst-simple-field gst-simple-wide">
+                <span>Full Address</span>
+                <textarea
+                  className="gst-field"
+                  rows={2}
+                  value={details.customerAddress ?? ""}
+                  onChange={(event) => updateDetail("customerAddress", event.target.value)}
+                  placeholder="House name, street, locality..."
+                />
+              </label>
+            </div>
+            <p className="gst-simple-help">Customer changes apply to this invoice only; the saved customer catalogue is not modified.</p>
+            </div>
           </div>
-          <div className="gst-editor-control">
-            <label htmlFor="gst-supply">Supply / Tax Type</label>
-            <select
-              id="gst-supply"
-              className="gst-field"
-              value={details.supplyType}
-              onChange={(event) => updateDetail("supplyType", event.target.value)}
-            >
-              <option value="intra">Within state (CGST + SGST)</option>
-              <option value="inter">Interstate (IGST)</option>
-            </select>
+
+          {/* Products can be added from catalogue; individual rows minimize by default. */}
+          <div className="gst-simple-editor-panel gst-simple-products-panel">
+            <div className="gst-simple-editor-panel-head gst-simple-products-head">
+              <span className="gst-simple-editor-step">02</span>
+              <div className="gst-simple-panel-title">
+                <h3>PRODUCTS</h3>
+                <p>{productsCollapsed ? `${lines.length} product(s) — click Expand.` : "Add products and edit discounts."}</p>
+              </div>
+              <button
+                type="button"
+                className="gst-simple-collapse-btn"
+                onClick={() => setProductsCollapsed((previous) => !previous)}
+                aria-expanded={!productsCollapsed}
+                aria-controls="gst-products-edit-fields"
+              >
+                {productsCollapsed ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
+                <span>{productsCollapsed ? "Expand" : "Minimize"}</span>
+              </button>
+            </div>
+            {productsCollapsed && (
+              <div className="gst-simple-products-summary">
+                <strong>{lines.length} product{lines.length === 1 ? "" : "s"}</strong>
+              </div>
+            )}
+            <div id="gst-products-edit-fields" hidden={productsCollapsed}>
+              <ProductCatalogSearch products={productCatalog} onAdd={addCatalogProduct} />
+              <div className="gst-simple-products-list">
+                {lines.map((line) => {
+                  const isExpanded = Boolean(expandedProducts[line.id]);
+                  const stockWarning = stockWarningForLine(line);
+                  const fieldId = `gst-product-details-${line.id}`;
+                  return (
+                    <div className={`gst-simple-product gst-compact-product${stockWarning ? " gst-stock-warning-row" : ""}`} key={line.id} title={stockWarning || undefined}>
+                      <button
+                        type="button"
+                        className="gst-compact-product-head"
+                        aria-expanded={isExpanded}
+                        aria-controls={fieldId}
+                        onClick={() => setExpandedProducts((previous) => ({ ...previous, [line.id]: !previous[line.id] }))}
+                        title={isExpanded ? "Minimize product" : "Expand product"}
+                      >
+                        <span className="gst-compact-product-identity">
+                          <strong>{line.productNumber || "—"}</strong>
+                          <span>{line.description || "Unnamed product"}</span>
+                        </span>
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+                      {isExpanded && (
+                        <div id={fieldId} className="gst-compact-product-expanded">
+                          {stockWarning && <p role="status" className="gst-stock-warning-line">{stockWarning} — check stock before issuing this bill.</p>}
+                          <div className="gst-simple-product-values">
+                            <label className="gst-simple-readonly-value gst-simple-editable-quantity">
+                              <span>Quantity</span>
+                              <input
+                                className="gst-field gst-quantity-input"
+                                type="number"
+                                inputMode="decimal"
+                                min="0.001"
+                                step="0.001"
+                                required
+                                value={line.quantity ?? ""}
+                                onChange={(event) =>
+                                  updateLine(line.id, "quantity", event.target.value)
+                                }
+                                aria-label={`Quantity for ${line.description || line.productNumber || "product"}`}
+                              />
+                            </label>
+                            <div className="gst-simple-readonly-value">
+                              <span>Rate</span><strong>₹{money(line.rate)}</strong>
+                            </div>
+                            <div className="gst-simple-readonly-value">
+                              <span>HSN/SAC</span><strong>{line.hsnSac || "—"}</strong>
+                            </div>
+                            <div className="gst-simple-readonly-value">
+                              <span>GST</span><strong>{numeric(line.gst)}%</strong>
+                            </div>
+                            <div className="gst-simple-field gst-simple-item-discount">
+                              <span>Product Discount</span>
+                              <div className="gst-linked-discount-fields">
+                                <label htmlFor={`gst-discount-amount-${line.id}`}>
+                                  <span>Discount Amount (₹)</span>
+                                  <input
+                                    id={`gst-discount-amount-${line.id}`}
+                                    className="gst-field"
+                                    type="number"
+                                    inputMode="decimal"
+                                    min="0"
+                                    max={maxLineDiscount(line)}
+                                    step="0.01"
+                                    value={lineDiscountDrafts[line.id]?.field === "amount"
+                                      ? lineDiscountDrafts[line.id].value
+                                      : String(round2(line.discount))}
+                                    onChange={(event) => changeLineDiscount(line, event.target.value, "amount")}
+                                  />
+                                </label>
+                                <label htmlFor={`gst-discount-percent-${line.id}`}>
+                                  <span>Discount Percentage (%)</span>
+                                  <input
+                                    id={`gst-discount-percent-${line.id}`}
+                                    className="gst-field"
+                                    type="number"
+                                    inputMode="decimal"
+                                    min="0"
+                                    max={discountPercent(maxLineDiscount(line), lineGrossAmount(line))}
+                                    step="any"
+                                    disabled={lineGrossAmount(line) <= 0}
+                                    value={lineDiscountDrafts[line.id]?.field === "percentage"
+                                      ? lineDiscountDrafts[line.id].value
+                                      : String(discountPercent(line.discount, lineGrossAmount(line)))}
+                                    onChange={(event) => changeLineDiscount(line, event.target.value, "percentage")}
+                                  />
+                                </label>
+                              </div>
+                              <small className="gst-simple-discount-note">
+                                Applied: ₹{money(line.discount)}. Maximum: ₹{money(maxLineDiscount(line))}
+                                {` (${discountPercent(maxLineDiscount(line), lineGrossAmount(line))}% of product gross)`}
+                              </small>
+                            </div>
+                          </div>
+                          <div className="gst-compact-product-actions">
+                            <span>Taxable ₹{money(calculateRow(line, details.supplyType).taxable)}</span>
+                            <button type="button" className="gst-simple-remove" onClick={() => removeProduct(line.id)}>
+                              <Trash2 size={14} /> Remove Product
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!lines.length && <p className="gst-simple-no-products">No products recorded. Search above to add one.</p>}
+              </div>
+            </div>
           </div>
-          <label className="gst-editor-check">
-            <input type="checkbox" checked={roundToRupee} onChange={(event) => setRoundToRupee(event.target.checked)} />
-            Round total to nearest ₹
-          </label>
-          <span className="gst-editor-note">The QR contains invoice and payment details, including the saved payment status. It is not a UPI payment QR or an official IRP-signed e-invoice QR.</span>
-        </div>
+
+          {/* Discount remains editable even when Products is minimized. */}
+          <div className="gst-simple-editor-panel gst-simple-adjustments-panel">
+            <div className="gst-simple-editor-panel-head">
+              <span className="gst-simple-editor-step">03</span>
+              <div className="gst-simple-panel-title">
+                <h3>DISCOUNT</h3>
+                <p>Set the invoice discount; GST and total update automatically.</p>
+              </div>
+            </div>
+            <div className="gst-simple-discount-box">
+              <div className="gst-simple-discount-title">
+                <strong>Total Invoice Discount</strong>
+                <p>Distributed proportionally across the existing items so GST stays accurate.</p>
+              </div>
+              <div className="gst-linked-discount-fields gst-linked-total-discount-fields">
+                <label className="gst-simple-field gst-simple-discount-input" htmlFor="gst-total-discount-amount">
+                  <span>Total Discount Amount (₹)</span>
+                  <input
+                    id="gst-total-discount-amount"
+                    className="gst-field"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max={round2(lines.reduce((sum, line) => sum + maxLineDiscount(line), 0))}
+                    step="0.01"
+                    disabled={!lines.length}
+                    value={totalDiscountDraft?.field === "amount"
+                      ? totalDiscountDraft.value : String(round2(totals.discount))}
+                    onChange={(event) => changeTotalDiscount(event.target.value, "amount")}
+                    aria-invalid={Boolean(discountError) && totalDiscountDraft?.field === "amount"}
+                    aria-describedby="gst-total-discount-help"
+                  />
+                </label>
+                <label className="gst-simple-field gst-simple-discount-input" htmlFor="gst-total-discount-percentage">
+                  <span>Total Discount Percentage (%)</span>
+                  <input
+                    id="gst-total-discount-percentage"
+                    className="gst-field"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max={discountPercent(lines.reduce((sum, line) => sum + maxLineDiscount(line), 0), totals.gross)}
+                    step="any"
+                    disabled={!lines.length || totals.gross <= 0}
+                    value={totalDiscountDraft?.field === "percentage"
+                      ? totalDiscountDraft.value : String(discountPercent(totals.discount, totals.gross))}
+                    onChange={(event) => changeTotalDiscount(event.target.value, "percentage")}
+                    aria-invalid={Boolean(discountError) && totalDiscountDraft?.field === "percentage"}
+                    aria-describedby="gst-total-discount-help"
+                  />
+                </label>
+              </div>
+              <p id="gst-total-discount-help" className="gst-simple-discount-note">
+                Maximum allowed: ₹{money(lines.reduce((sum, line) => sum + maxLineDiscount(line), 0))}
+                {` (${discountPercent(lines.reduce((sum, line) => sum + maxLineDiscount(line), 0), totals.gross)}% of pre-GST gross). `}
+                Discounts cannot reduce products below purchase price. Missing costs must be entered in Products &amp; Services.
+              </p>
+              {discountError && <p className="gst-simple-discount-error" role="alert">{discountError}</p>}
+              <div className="gst-simple-discount-calculation">
+                <span>Gross: ₹ {money(totals.gross)}</span>
+                <span>Discount: − ₹ {money(totals.discount)}</span>
+                <strong>Taxable: ₹ {money(totals.taxable)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="gst-simple-editor-footer">
+            <div className="gst-simple-total-preview">Invoice Total: <strong>₹ {money(totals.grandTotal)}</strong></div>
+            <div className="gst-simple-footer-actions">
+              <button type="button" className="gst-simple-cancel-btn" onClick={cancelSimpleEdit}>Cancel</button>
+              <button type="button" className="gst-simple-save-btn" onClick={saveChanges} disabled={!loadedInvoiceId || Boolean(discountError)}>
+                <Save size={16} /> Save Bill Changes
+              </button>
+            </div>
+          </div>
+        </section>
       )}
 
+      <section className={`gst-live-bill${editing ? " is-live-preview" : ""}`} aria-label="Live invoice preview">
+        {editing && (
+          <div className="gst-live-preview-head no-print">
+            <div>
+              <strong>Live Bill Preview</strong>
+              <span>Updates automatically as you edit the left panel</span>
+            </div>
+            <span className="gst-live-status"><span /> LIVE</span>
+          </div>
+        )}
+        <div className="gst-bill-paper-scale">
       <main className="gst-invoice-sheet" id="invoice">
         <header className="gst-company-head">
           <div className="gst-company-brand">
             <div className="gst-small-kicker">TRADITIONAL GST BILL</div>
             <h1>
-              {editing ? input("sellerName", "Company name") : (
-                <>The Cam Cr<span className="gst-red">e</span>w_TVM</>
-              )}
+              <>The Cam Cr<span className="gst-red">e</span>w_TVM</>
             </h1>
             <p className="gst-company-subtitle">{input("sellerSubtitle", "Business subtitle")}</p>
             <p>{input("sellerAddress", "Business address")}</p>
@@ -916,7 +1346,7 @@ useEffect(() => {
             <div className="gst-invoice-title">TAX INVOICE <small>(GST INVOICE)</small></div>
             <div className="gst-invoice-meta-grid">
               <div><b>Invoice No.</b>{input("invoiceNumber", "Invoice number")}</div>
-              <div><b>Invoice Date</b>{editing ? input("invoiceDate", "Invoice date", { type: "date" }) : <span>{formatDate(details.invoiceDate)}</span>}</div>
+              <div><b>Invoice Date</b><span>{formatDate(details.invoiceDate)}</span></div>
               <div><b>Customer ID</b>{input("customerId", "Customer ID")}</div>
               <div><b>Terms</b>{input("terms", "Payment terms")}</div>
             </div>
@@ -980,28 +1410,17 @@ useEffect(() => {
           </aside>
         </section>
 <section className="gst-product-section">
-          {/* Catalogue is loaded from the same local store as Admin Products. */}
-          {editing && (
-            <div className="gst-catalog-search no-print">
-              <ProductCatalogSearch
-                products={productCatalog}
-                onSelect={(product) => {
-                  addCatalogProduct(product);
-                }}
-              />
-            </div>
-          )}
           <div className="gst-products-scroll">
             <table className="gst-products-table">
+              {/* Seven column widths = seven table headers. */}
               <colgroup>
                 <col style={{ width: "5%" }} />
-                <col style={{ width: "12%" }} />
-                <col style={{ width: "29%" }} />
-                <col style={{ width: "11%" }} />
-                <col style={{ width: "9%" }} />
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "11%" }} />
                 <col style={{ width: "13%" }} />
+                <col style={{ width: "34%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "14%" }} />
               </colgroup>
               <thead>
                 <tr>
@@ -1011,95 +1430,25 @@ useEffect(() => {
                   <th>HSN/SAC</th>
                   <th>Quantity</th>
                   <th>Rate</th>
-                  <th>Discount</th>
                   <th>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {totals.entries.map((row, index) => (
-                  <tr key={row.id}>
+                  <tr key={row.id} className={editing && stockWarningForLine(row) ? "gst-stock-warning-preview" : undefined} title={editing ? (stockWarningForLine(row) || undefined) : undefined}>
                     <td className="gst-number">{index + 1}</td>
-                    <td>
-                      {editing ? (
-                        <input
-                          className="gst-field gst-product-number"
-                          value={row.productNumber || ""}
-                          onChange={(e) => updateLine(row.id, "productNumber", e.target.value)}
-                          placeholder="PRD-000001"
-                        />
-                      ) : (
-                        <span className="gst-code-text">{row.productNumber || "—"}</span>
-                      )}
-                    </td>
-                    <td className="gst-description">
-                      {editing ? (
-                        <>
-                          <textarea
-                            className="gst-field"
-                            value={row.description || ""}
-                            onChange={(e) => updateLine(row.id, "description", e.target.value)}
-                            rows={2}
-                            placeholder="Product / Service"
-                          />
-                          <label className="gst-inline-tax no-print">
-                            GST %
-                            <input
-                              className="gst-field"
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={row.gst ?? ""}
-                              onChange={(e) => updateLine(row.id, "gst", e.target.value)}
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            className="gst-remove no-print"
-                            onClick={() => removeLine(row.id)}
-                          >
-                            <Trash2 size={12} /> Remove
-                          </button>
-                        </>
-                      ) : (
-                        <strong>{row.description || "—"}</strong>
-                      )}
-                    </td>
-                    <td>
-                      {editing ? (
-                        <input
-                          className="gst-field"
-                          value={row.hsnSac || ""}
-                          onChange={(e) => updateLine(row.id, "hsnSac", e.target.value)}
-                          placeholder="HSN/SAC"
-                        />
-                      ) : (row.hsnSac || "—")}
-                    </td>
-                    <td className="gst-num">
-                      {editing ? (
-                        <input className="gst-field" type="number" step="0.001" min="0"
-                          value={row.quantity} onChange={(e) => updateLine(row.id, "quantity", e.target.value)} />
-                      ) : numeric(row.quantity).toFixed(3)}
-                    </td>
-                    <td className="gst-num">
-                      {editing ? (
-                        <input className="gst-field" type="number" min="0" step="0.01"
-                          value={row.rate} onChange={(e) => updateLine(row.id, "rate", e.target.value)} />
-                      ) : money(row.rate)}
-                    </td>
-                    <td className="gst-num">
-                      {editing ? (
-                        <input className="gst-field" type="number" min="0" step="0.01"
-                          value={row.discount} onChange={(e) => updateLine(row.id, "discount", e.target.value)} />
-                      ) : money(row.discount)}
-                    </td>
+                    <td className="gst-number"><span className="gst-code-text">{row.productNumber || "—"}</span></td>
+                    <td className="gst-description"><strong>{row.description || "—"}</strong></td>
+                    <td className="gst-number">{row.hsnSac || "—"}</td>
+                    <td className="gst-num">{numeric(row.quantity).toFixed(3)}</td>
+                    <td className="gst-num">{money(row.rate)}</td>
                     <td className="gst-num gst-row-amount">{money(row.taxable)}</td>
                   </tr>
                 ))}
-                {totals.entries.length < 8 &&
-                  Array.from({ length: 8 - totals.entries.length }, (_, index) => (
+                {totals.entries.length < 6 &&
+                  Array.from({ length: 6 - totals.entries.length }, (_, index) => (
                     <tr className="gst-blank-row" key={`empty-${index}`}>
-                      {Array.from({ length: 8 }, (_, cell) => <td key={cell}>&nbsp;</td>)}
+                      {Array.from({ length: 7 }, (_, cell) => <td key={cell}>&nbsp;</td>)}
                     </tr>
                   ))}
               </tbody>
@@ -1118,10 +1467,6 @@ useEffect(() => {
             <div><span>CGST</span><strong>{money(totals.cgst)}</strong></div>
             <div><span>SGST</span><strong>{money(totals.sgst)}</strong></div>
             <div><span>IGST</span><strong>{money(totals.igst)}</strong></div>
-            {(totals.adjustment !== 0 || editing) && (
-              <div><span>Adjustment</span>{editing ? <input className="gst-field gst-adjust-field" type="number" step="0.01" value={adjustment} onChange={(event) => setAdjustment(event.target.value)} /> : <strong>{money(totals.adjustment)}</strong>}</div>
-            )}
-            <div><span>Round Off</span><strong>{money(totals.roundOff)}</strong></div>
             <div className="gst-grand-total"><span>TOTAL</span><strong>₹ {money(totals.grandTotal)}</strong></div>
           </div>
         </section>
@@ -1161,7 +1506,7 @@ useEffect(() => {
               <DetailRow label="A/C NO.">{input("bankAccountNumber", "Account number")}</DetailRow>
               <DetailRow label="BRANCH">{input("bankBranch", "Branch")}</DetailRow>
               <DetailRow label="IFSC">{input("bankIfsc", "IFSC code")}</DetailRow>
-              {(editing || details.bankUpiId) && (
+              {Boolean(details.bankUpiId) && (
                 <DetailRow label="UPI ID">{input("bankUpiId", "UPI ID (optional)")}</DetailRow>
               )}
             </div>
@@ -1184,6 +1529,9 @@ useEffect(() => {
         </section>
         <footer className="gst-footer">Invoice QR contains a text snapshot of the product list and recorded payment information. It does not confirm receipt of funds, initiate a payment, or serve as an official IRP-signed GST e-invoice QR. Verify details before issuing.</footer>
       </main>
+        </div>
+      </section>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo, useEffect, useRef, useId } from 'react';
 import { useStore } from '@/lib/store';
+import { productPurchasePrice, maxAllowedLineDiscount, lineDiscountError, isServiceProduct } from '@/lib/billingDiscountLimit';
 import { currency, shortCurrency, niceDate, isoToday } from '@/lib/data';
 import { SummaryCards, SalesGraph, PaymentAnalytics, RecentInvoices, QuickActions } from './Widgets';
 import { Plus, Search, Eye, Trash2, Printer, ArrowLeft, Save, Check, Download, FileText, Users, Package, Wallet, Receipt, ChartNoAxesCombined, Settings as SettingsIcon, RotateCcw, Edit2, CalendarDays, X } from 'lucide-react';
@@ -15,7 +16,40 @@ function openBillInvoice(invoiceId) {
 }
 
 const blankCustomer = { name: '', company: '', phone: '', email: '', address: '', city: '', state: 'Kerala', pin: '', gstin: '' };
-const blankProduct = { number: '', name: '', category: 'CCTV Cameras', hsnSac: '', price: '', gst: 18, stock: '' };
+const blankProduct = { number: '', name: '', category: 'CCTV Cameras', hsnSac: '', purchasePrice: '', price: '', salePrice: '', gst: 18, stock: '' };
+
+// Use the optional catalogue sale price when creating a NEW invoice line.
+// Preserve the original Unit Rate for products without a sale price.
+// A sale price of 0 is valid; an empty value means no sale price is set.
+function hasProductSalePrice(product) {
+  const value = product?.salePrice;
+  if (value === null || value === undefined || String(value).trim() === '') {
+    return false;
+  }
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0;
+}
+
+function productInvoiceRate(product) {
+  if (hasProductSalePrice(product)) return Number(product.salePrice);
+  const unitRate = Number(product?.price);
+  return Number.isFinite(unitRate) && unitRate >= 0 ? unitRate : 0;
+}
+
+
+// Product stock is read from the existing Admin Products catalogue.
+// Missing stock values and Services are not treated as out-of-stock.
+// This warning is visual only; it does not decrement stock or block billing.
+function productStockWarning(product, quantity = 1) {
+  if (!product || String(product.category || '').trim().toLowerCase().startsWith('service')) return null;
+  const rawStock = product.stock;
+  if (rawStock === null || rawStock === undefined || String(rawStock).trim() === '') return null;
+  const available = Number(rawStock);
+  if (!Number.isFinite(available) || available < 0) return null;
+  if (available === 0) return 'Out of Stock';
+  if (Number(quantity) > available) return `Only ${available} in stock`;
+  return null;
+}
 
 // Same per-line calculation used by the classic GST bill.
 function invoiceLineTotals(item) {
@@ -427,6 +461,8 @@ export function NewInvoice({ go, view }) {
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ ...blankCustomer });
   const [newCustomerError, setNewCustomerError] = useState('');
+  const [stockMessage, setStockMessage] = useState('');
+  const [discountNotice, setDiscountNotice] = useState('');
 
   const selectedCustomer = customers.find(
     (customer) => String(customer.id) === String(customerId)
@@ -558,22 +594,39 @@ export function NewInvoice({ go, view }) {
           name: String(product.name || ''),
           hsnSac: String(product.hsnSac || ''),
           qty: 1,
-          price: Number(product.price) || 0,
+          // Invoice captures the sale price at selection time. Updating the
+          // catalogue later does not change an existing invoice line.
+          price: productInvoiceRate(product),
+          purchasePrice: productPurchasePrice(product),
+          isService: isServiceProduct(product),
           discount: 0,
           gst: Number(product.gst) || 0,
         },
       ];
     });
+    const currentQty = items.find((line) => String(line.number) === String(product.number))?.qty ?? 0;
+    const warning = productStockWarning(product, Number(currentQty) + 1);
+    setStockMessage(warning ? `${product.name}: ${warning}. Item highlighted in red.` : '');
     setProductQuery('');
     setShowOptions(false);
   }
 
   function changeItem(rowId, key, value) {
-    setItems((previous) =>
-      previous.map((item) =>
-        item._rowId === rowId ? { ...item, [key]: value } : item
-      )
-    );
+    const target = items.find((item) => item._rowId === rowId);
+    if (!target) return;
+    const updated = { ...target, [key]: value };
+    const catalog = products.find((product) => String(product.number).trim().toLowerCase() === String(target.number).trim().toLowerCase());
+    const max = maxAllowedLineDiscount(updated, catalog);
+    if (key === 'discount' && Number(value) > max) {
+      setDiscountNotice(`Maximum allowed discount for ${target.name} is ₹${max.toFixed(2)}. The selling amount cannot fall below purchase price.`);
+      updated.discount = max;
+    } else if ((key === 'qty' || key === 'price') && Number(updated.discount) > max) {
+      updated.discount = max;
+      setDiscountNotice(`Discount adjusted to ₹${max.toFixed(2)} because the quantity or rate changed.`);
+    } else {
+      setDiscountNotice('');
+    }
+    setItems((previous) => previous.map((item) => item._rowId === rowId ? updated : item));
   }
 
   function removeItem(rowId) {
@@ -597,12 +650,12 @@ export function NewInvoice({ go, view }) {
           !Number.isFinite(quantity) || quantity <= 0 ||
           !Number.isFinite(rate) || rate < 0 ||
           !Number.isFinite(lineDiscount) || lineDiscount < 0 ||
-          lineDiscount > quantity * rate ||
+          Boolean(lineDiscountError(item, products.find((product) => String(product.number).trim().toLowerCase() === String(item.number).trim().toLowerCase()))) ||
           !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100
         );
       })
     ) {
-      return alert('Check each item: description, quantity, rate, discount and GST rate must be valid.');
+      return alert('Check each product: discount must not reduce its selling amount below the purchase price. Configure Purchase Price in Products & Services if missing.');
     }
     if (invoices.some((invoice) => invoice.id === invoiceNumber)) {
       return alert('This invoice number already exists. Refresh and try again.');
@@ -679,7 +732,7 @@ export function NewInvoice({ go, view }) {
     <>
       <Top
         title="Create New Invoice"
-        subtitle="Prepare a GST invoice with item discounts, HSN/SAC, and automatic tax calculations."
+        subtitle="Select products at their sale prices, with editable rates, item discounts and automatic GST."
         action={
           <Button kind="outline" onClick={() => go('invoices')}>
             <ArrowLeft size={16} /> All Invoices
@@ -819,21 +872,34 @@ export function NewInvoice({ go, view }) {
                   />
                   {showOptions && (
                     <div className="absolute top-full left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-[#dce9df] bg-white shadow-xl">
-                      {filteredProducts.map((product) => (
+                      {filteredProducts.map((product) => {
+                        const stockWarning = productStockWarning(product);
+                        return (
                         <button
                           key={product.id}
                           type="button"
-                          className="flex w-full items-center justify-between gap-3 border-b border-[#edf2ee] px-4 py-3 text-left hover:bg-[#f2f9f4] last:border-0"
+                          className={`flex w-full items-center justify-between gap-3 border-b px-4 py-3 text-left last:border-0 ${stockWarning ? "border-red-200 bg-red-50 hover:bg-red-100" : "border-[#edf2ee] hover:bg-[#f2f9f4]"}`}
+                          title={stockWarning ? `${product.name}: ${stockWarning}` : undefined}
                           onClick={() => addProduct(product)}
                         >
                           <span className="min-w-0">
-                            <span className="block text-xs font-bold text-[#075c3b]">{product.number}</span>
-                            <span className="block text-sm text-[#273b2e]">{product.name}</span>
+                            <span className={`block text-xs font-bold ${stockWarning ? "text-red-700" : "text-[#075c3b]"}`}>{product.number}</span>
+                            <span className={`block text-sm ${stockWarning ? "font-bold text-red-700" : "text-[#273b2e]"}`}>{product.name}</span>
+                            {stockWarning && <span className="mt-1 block text-[11px] font-extrabold text-red-700">{stockWarning}</span>}
                             {product.hsnSac && <span className="block text-[11px] muted">HSN/SAC: {product.hsnSac}</span>}
                           </span>
-                          <span className="shrink-0 text-sm font-bold">{currency(product.price)}</span>
+                          <span className="shrink-0 text-right">
+                            <span className="block text-sm font-bold text-[#174c94]">
+                              {currency(productInvoiceRate(product))}
+                            </span>
+                            {hasProductSalePrice(product) && (
+                              <span className="mt-1 block text-[11px] text-slate-500">
+                                Unit Rate: {currency(product.price)}
+                              </span>
+                            )}
+                          </span>
                         </button>
-                      ))}
+                      );})}
                       {!filteredProducts.length && (
                         <div className="px-4 py-3 text-sm muted">No matching products found. Add products through the Products & Services catalogue first.</div>
                       )}
@@ -842,6 +908,8 @@ export function NewInvoice({ go, view }) {
                 </div>
               </div>
 
+              {stockMessage && <p role="status" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{stockMessage}</p>}
+              {discountNotice && <p role="alert" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{discountNotice}</p>}
               {items.length ? (
                 <div className="table-wrap mt-5 overflow-x-auto">
                   <table className="data-table min-w-[880px]">
@@ -859,13 +927,17 @@ export function NewInvoice({ go, view }) {
                     <tbody>
                       {items.map((item, index) => {
                         const amounts = rows[index];
+                        const product = products.find((entry) => String(entry.number).trim().toLowerCase() === String(item.number).trim().toLowerCase());
+                        const stockWarning = productStockWarning(product, item.qty);
+                        const maximumDiscount = maxAllowedLineDiscount(item, product);
                         return (
-                          <tr key={item._rowId}>
+                          <tr key={item._rowId} className={stockWarning ? "bg-red-50" : undefined} title={stockWarning || undefined}>
                             <td className="text-center align-top font-semibold">{index + 1}</td>
                             <td className="align-top">
                               <div className="min-w-[195px] space-y-2">
+                                {stockWarning && <p role="status" className="mb-2 rounded-md bg-red-100 px-2 py-1 text-[11px] font-extrabold text-red-700">{stockWarning}</p>}
                                 <input
-                                  className="field !p-2 !text-xs"
+                                  className={`field !p-2 !text-xs ${stockWarning ? "!border-red-300 !text-red-700" : ""}`}
                                   value={item.number}
                                   readOnly
                                   title="Product number is selected from the catalogue"
@@ -940,10 +1012,12 @@ export function NewInvoice({ go, view }) {
                                 type="number"
                                 min="0"
                                 step="0.01"
+                                max={maximumDiscount}
                                 value={item.discount}
                                 onChange={(event) => changeItem(item._rowId, 'discount', event.target.value)}
                                 aria-label="Line discount in rupees"
                               />
+                              <span className="mt-1 block text-[10px] font-semibold text-amber-700">Max ₹{maximumDiscount.toFixed(2)}</span>
                             </td>
                             <td className="align-top text-right whitespace-nowrap">
                               <strong className="text-[#095e3d]">{currency(amounts.taxable)}</strong>
@@ -1170,69 +1244,231 @@ export function Customers() {
 }
 export function Products() {
   const { products, update } = useStore();
-  const [query, setQuery] = useState(''), [edit, setEdit] = useState(null), [form, setForm] = useState(blankProduct), [open, setOpen] = useState(false);
-  const filtered = products.filter(p => Object.values(p).join(' ').toLowerCase().includes(query.toLowerCase()));
-  function begin(p) {
-    setEdit(p?.id || null);
-    setForm(p ? { ...p } : blankProduct);
+  const [query, setQuery] = useState('');
+  const [edit, setEdit] = useState(null);
+  const [form, setForm] = useState({ ...blankProduct });
+  const [open, setOpen] = useState(false);
+
+  const filtered = products.filter((product) =>
+    Object.values(product).join(' ').toLowerCase().includes(query.toLowerCase())
+  );
+
+  function begin(product) {
+    setEdit(product?.id || null);
+    setForm(
+      product
+        ? { ...blankProduct, ...product, salePrice: product.salePrice ?? '' }
+        : { ...blankProduct }
+    );
     setOpen(true);
   }
-  function save(e) {
-    e.preventDefault();
-    if (!form.name.trim() || !form.number.trim()) return;
-    const same = products.some(p => p.number.trim().toLowerCase() === form.number.trim().toLowerCase() && p.id !== edit);
+
+  function save(event) {
+    event.preventDefault();
+
+    const number = String(form.number ?? '').trim();
+    const name = String(form.name ?? '').trim();
+    if (!name || !number) {
+      return alert('Product number and product name are required.');
+    }
+
+    const same = products.some(
+      (product) =>
+        String(product.number ?? '').trim().toLowerCase() === number.toLowerCase() &&
+        product.id !== edit
+    );
     if (same) return alert('A product with this number already exists.');
-    const entry = { ...form, id: edit || `P${Date.now()}`, price: Number(form.price), gst: Number(form.gst), stock: Number(form.stock) };
-    update('products', a => edit ? a.map(x => x.id === edit ? entry : x) : [...a, entry]);
+
+    const price = Number(form.price || 0);
+    const purchasePrice = form.purchasePrice === '' || form.purchasePrice === null || form.purchasePrice === undefined
+      ? null : Number(form.purchasePrice);
+    if (purchasePrice !== null && (!Number.isFinite(purchasePrice) || purchasePrice < 0)) {
+      return alert('Purchase Price must be a valid, non-negative amount.');
+    }
+    const hasSalePrice = form.salePrice !== '' && form.salePrice !== null && form.salePrice !== undefined;
+    const salePrice = hasSalePrice ? Number(form.salePrice) : null;
+    const gst = Number(form.gst || 0);
+    const stock = Number(form.stock || 0);
+
+    if (!Number.isFinite(price) || price < 0) {
+      return alert('Unit Rate must be a valid, non-negative amount.');
+    }
+    if (hasSalePrice && (!Number.isFinite(salePrice) || salePrice < 0)) {
+      return alert('Sale Price must be a valid, non-negative amount.');
+    }
+    if (!Number.isFinite(gst) || gst < 0 || gst > 100) {
+      return alert('GST Rate must be between 0 and 100.');
+    }
+    if (!Number.isFinite(stock) || stock < 0) {
+      return alert('Stock must be a valid, non-negative number.');
+    }
+
+    const entry = {
+      ...form,
+      id: edit || `P${Date.now()}`,
+      number,
+      name,
+      price,
+      purchasePrice, // Stored cost floor for discounts. Null means not configured.
+      salePrice, // null means that a sale price has not been set.
+      gst,
+      stock,
+    };
+
+    update('products', (previous) =>
+      edit
+        ? previous.map((product) => product.id === edit ? entry : product)
+        : [...previous, entry]
+    );
     setOpen(false);
   }
+
   function remove(id) {
-    if (confirm('Delete this product?')) update('products', a => a.filter(x => x.id !== id));
+    if (confirm('Delete this product?')) {
+      update('products', (previous) => previous.filter((product) => product.id !== id));
+    }
   }
-  return <><Top title="Products & Services" subtitle="Manage catalog numbers, product names, rates, GST and stock." action={<Button onClick={() => begin()}><Plus size={17} />Add Product</Button>} />
-    <div className="panel p-4">
-      <div className="relative mb-4 max-w-lg"><Search size={17} className="absolute top-3 left-3 muted" /><input value={query} onChange={e => setQuery(e.target.value)} className="field !pl-10" placeholder="Search product number or name" />
+
+  const fields = [
+    ['number', 'Product Number *'],
+    ['name', 'Product Name *'],
+    ['hsnSac', 'HSN/SAC'],
+    ['category', 'Category'],
+    ['price', 'Unit Rate (₹)'],
+    ['purchasePrice', 'Purchase Price / Cost (₹)'],
+    ['salePrice', 'Sale Price (₹)'],
+    ['gst', 'GST Rate (%)'],
+    ['stock', 'Available Stock'],
+  ];
+
+  return (
+    <>
+      <Top
+        title="Products & Services"
+        subtitle="Manage product numbers, unit rates, sale prices, GST and stock."
+        action={
+          <Button onClick={() => begin()}>
+            <Plus size={17} /> Add Product
+          </Button>
+        }
+      />
+
+      <div className="panel p-4">
+        <div className="relative mb-4 max-w-lg">
+          <Search size={17} className="absolute left-3 top-3 muted" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="field !pl-10"
+            placeholder="Search product number or name"
+          />
+        </div>
+
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                {[
+                  'Product No.',
+                  'Product / Service',
+                  'HSN/SAC',
+                  'Category',
+                  'Unit Rate',
+                  'Purchase Price',
+                  'Sale Price',
+                  'GST',
+                  'Stock',
+                  'Actions',
+                ].map((heading) => <th key={heading}>{heading}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((product) => (
+                <tr key={product.id}>
+                  <td className="font-bold text-[#174c94]">{product.number}</td>
+                  <td className="font-semibold">{product.name}</td>
+                  <td>{product.hsnSac || '—'}</td>
+                  <td>{product.category}</td>
+                  <td>{currency(product.price)}</td>
+                  <td>{productPurchasePrice(product) === null ? 'Not set' : currency(productPurchasePrice(product))}</td>
+                  <td className="font-bold text-[#174c94]">
+                    {product.salePrice !== undefined &&
+                     product.salePrice !== null &&
+                     product.salePrice !== ''
+                      ? currency(Number(product.salePrice))
+                      : '—'}
+                  </td>
+                  <td>{product.gst}%</td>
+                  <td className={productStockWarning(product) ? 'font-bold text-red-700' : ''}>
+                    {product.category === 'Service' ? '—' : product.stock}
+                    {productStockWarning(product) && <span className="ml-2 text-[11px]">{productStockWarning(product)}</span>}
+                  </td>
+                  <td>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        title="Edit product"
+                        aria-label={`Edit ${product.name}`}
+                        className="btn btn-outline !p-2"
+                        onClick={() => begin(product)}
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        title="Delete product"
+                        aria-label={`Delete ${product.name}`}
+                        className="btn btn-danger !p-2"
+                        onClick={() => remove(product.id)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!filtered.length && <Empty text="No products match your search." />}
       </div>
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>{['Product No.', 'Product / Service', 'HSN/SAC', 'Category', 'Rate', 'GST', 'Stock', 'Actions'].map(x => <th key={x}>{x}</th>)}
-            </tr>
-          </thead>
-          <tbody>{filtered.map(p =>
-            <tr key={p.id}>
-              <td className="font-bold text-[#057647]">{p.number}</td>
-              <td className="font-semibold">{p.name}</td>
-              <td>{p.hsnSac || '—'}</td>
-              <td>{p.category}</td>
-              <td>{currency(p.price)}</td>
-              <td>{p.gst}%</td>
-              <td>{p.category === 'Service' ? '—' : p.stock}</td>
-              <td>
-                <div className="flex gap-2">
-                  <button className="btn btn-outline !p-2" onClick={() => begin(p)}><Edit2 size={15} /></button>
-                  <button className="btn btn-danger !p-2" onClick={() => remove(p.id)}><Trash2 size={15} /></button>
+
+      {open && (
+        <Modal title={edit ? 'Edit Product' : 'Add Product'} onClose={() => setOpen(false)}>
+          <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
+            {fields.map(([key, label]) => {
+              const numeric = ['price', 'purchasePrice', 'salePrice', 'gst', 'stock'].includes(key);
+              return (
+                <div key={key}>
+                  <Field title={label}>
+                    <input
+                      required={['number', 'name'].includes(key)}
+                      className="field"
+                      type={numeric ? 'number' : 'text'}
+                      min={numeric ? 0 : undefined}
+                      max={key === 'gst' ? 100 : undefined}
+                      step={['price', 'purchasePrice', 'salePrice', 'gst'].includes(key) ? '0.01' : undefined}
+                      value={form[key] ?? ''}
+                      onChange={(event) =>
+                        setForm((previous) => ({ ...previous, [key]: event.target.value }))
+                      }
+                    />
+                  </Field>
                 </div>
-              </td>
-            </tr>
-          )}
-          </tbody>
-        </table>
-      </div>
-      {!filtered.length && <Empty text="No products match your search." />}
-    </div>
-    {open && <Modal title={edit ? 'Edit Product' : 'Add Product'} onClose={() => setOpen(false)}>
-      <form onSubmit={save} className="grid sm:grid-cols-2 gap-4">{[['number', 'Product Number *'], ['name', 'Product Name *'], ['hsnSac', 'HSN/SAC'], ['category', 'Category'], ['price', 'Unit Rate (₹)'], ['gst', 'GST Rate (%)'], ['stock', 'Available Stock']].map(([k, label]) =>
-        <div key={k}>
-          <Field title={label}><input required={['number', 'name'].includes(k)} className="field" type={['price', 'gst', 'stock'].includes(k) ? 'number' : 'text'} min={['price', 'gst', 'stock'].includes(k) ? 0 : undefined} value={form[k] ?? ''} onChange={e => setForm(a => ({ ...a, [k]: e.target.value }))} /></Field>
-        </div>
+              );
+            })}
+            <div className="flex justify-end sm:col-span-2">
+              <button type="submit" className="btn btn-primary">
+                <Save size={16} /> Save Product
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
-        <div className="sm:col-span-2 flex justify-end">
-          <button type="submit" className="btn btn-primary"><Save size={16} />Save Product</button>
-        </div>
-      </form>
-    </Modal>}</>;
+    </>
+  );
 }
+
 export function Payments({ view }) {
   const { invoices, update } = useStore();
   const [method, setMethod] = useState('UPI');

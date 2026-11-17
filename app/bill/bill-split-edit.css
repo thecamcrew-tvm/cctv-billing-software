@@ -1,0 +1,764 @@
+.gst-simple-editor {
+  --bill-navy: #071e49;
+  --bill-blue: #174c94;
+  --bill-gold: #e4ad44;
+  width: min(1120px, calc(100% - 32px));
+  margin: 22px auto 30px;
+  display: grid;
+  gap: 18px;
+  color: #172b46;
+  font-family: Inter, Arial, sans-serif;
+}
+.gst-simple-editor *, .gst-simple-editor *::before, .gst-simple-editor *::after { box-sizing: border-box; }
+.gst-simple-editor-heading {
+  padding: 18px 24px;
+  background: linear-gradient(120deg, #071e49, #174c94);
+  color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(7, 30, 73, 0.13);
+  border-left: 5px solid var(--bill-gold);
+}
+.gst-simple-editor-kicker { font-size: 10px; font-weight: 800; color: #f1c978; letter-spacing: 2px; }
+.gst-simple-editor-heading h2 { font-size: clamp(19px, 3vw, 27px); margin: 6px 0 7px; font-weight: 800; }
+.gst-simple-editor-heading p { margin: 0; color: #cbd7eb; font-size: 12px; line-height: 1.6; }
+.gst-simple-editor-panel {
+  background: #fff;
+  border: 1px solid #dde6f3;
+  border-radius: 16px;
+  padding: clamp(16px, 3vw, 25px);
+  box-shadow: 0 9px 24px rgba(7, 30, 73, 0.055);
+}
+.gst-simple-editor-panel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin-bottom: 20px; }
+.gst-simple-editor-step {
+  width: 39px; height: 39px; flex: 0 0 39px; display: grid; place-items: center;
+  border-radius: 11px; background: #eaf0fa; border: 1px solid #d5e2f2;
+  color: var(--bill-blue); font-size: 12px; font-weight: 900;
+}
+.gst-simple-editor-panel-head h3 { color: var(--bill-navy); font-size: 16px; font-weight: 800; margin: 0 0 4px; }
+.gst-simple-editor-panel-head p { margin: 0; font-size: 12px; color: #77879f; }
+.gst-simple-fields, .gst-simple-product-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
+.gst-simple-field { display: flex; flex-direction: column; min-width: 0; gap: 7px; }
+.gst-simple-field > span, .gst-simple-customer-select > label {
+  font-size: 11px; font-weight: 750; color: #344b6c;
+}
+.gst-simple-editor .gst-field {
+  display: block;
+  width: 100%; min-height: 43px; min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #d6e1ef; border-radius: 9px;
+  outline: none; background: #fff; color: #172b46;
+  font-size: 13px; line-height: 1.4; box-shadow: none;
+}
+.gst-simple-editor textarea.gst-field { min-height: 76px; resize: vertical; }
+.gst-simple-editor .gst-field:focus { border-color: #174c94; box-shadow: 0 0 0 3px rgba(23, 76, 148, .12); }
+.gst-simple-customer-select { display: grid; gap: 7px; max-width: 520px; margin-bottom: 20px; }
+.gst-simple-wide { grid-column: 1 / -1; }
+.gst-simple-help { margin: 14px 0 0; color: #7e8b9c; font-size: 11px; line-height: 1.6; }
+.gst-simple-products-head > div { flex: 1; min-width: 200px; }
+.gst-simple-add-btn, .gst-simple-save-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 42px; border: 1px solid #d5a343; border-radius: 10px;
+  padding: 9px 15px; background: #071e49; color: #fff;
+  font-size: 12px; font-weight: 800; cursor: pointer;
+}
+.gst-simple-add-btn:hover, .gst-simple-save-btn:hover { background: #174c94; }
+.gst-simple-save-btn:disabled { opacity: .55; cursor: not-allowed; }
+.gst-simple-catalog-search { max-width: 630px; }
+.gst-simple-catalog-search .gst-catalog-picker { margin-bottom: 22px !important; }
+.gst-simple-products-list { display: grid; gap: 12px; }
+.gst-simple-product { padding: 16px; border: 1px solid #e0e8f2; background: #fafcff; border-radius: 12px; }
+.gst-simple-product-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+.gst-simple-product-title strong { font-size: 13px; font-weight: 800; color: var(--bill-navy); }
+.gst-simple-product-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.gst-simple-description { grid-column: span 2; }
+.gst-simple-remove { display: inline-flex; align-items: center; gap: 5px; color: #b43239; border: 0; background: transparent; padding: 6px; font-size: 12px; font-weight: 750; cursor: pointer; }
+.gst-simple-remove:hover { color: #882229; }
+.gst-simple-item-total { font-size: 12px; color: #6f7f95; margin-top: 12px; text-align: right; }
+.gst-simple-item-total strong { color: var(--bill-blue); font-size: 13px; }
+.gst-simple-no-products { padding: 20px; text-align: center; color: #64748b; background: #f5f8fc; border: 1px dashed #b8cbe5; border-radius: 11px; font-size: 13px; }
+.gst-simple-editor-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; background: #fff; border: 1px solid #dde6f3; border-radius: 14px; padding: 17px 22px; box-shadow: 0 9px 24px rgba(7, 30, 73, .06); }
+.gst-simple-total-preview { color: #536681; font-size: 13px; }
+.gst-simple-total-preview strong { color: var(--bill-navy); font-size: 20px; margin-left: 5px; }
+.gst-simple-footer-actions { display: flex; align-items: center; gap: 9px; }
+.gst-simple-cancel-btn { min-height: 42px; padding: 9px 18px; background: #fff; border: 1px solid #cbd7e7; border-radius: 10px; color: #344b6c; cursor: pointer; font-size: 12px; font-weight: 750; }
+.gst-simple-cancel-btn:hover { background: #f1f6fd; }
+@media (max-width: 900px) {
+  .gst-simple-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gst-simple-product-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .gst-simple-editor { width: calc(100% - 20px); gap: 12px; }
+  .gst-simple-editor-panel { padding: 14px; }
+  .gst-simple-fields, .gst-simple-product-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .gst-simple-description, .gst-simple-wide { grid-column: 1 / -1; }
+  .gst-simple-products-head .gst-simple-add-btn { margin-left: 52px; }
+  .gst-simple-editor-footer { padding: 14px; }
+  .gst-simple-footer-actions { width: 100%; }
+  .gst-simple-footer-actions > button { flex: 1; }
+  .gst-simple-total-preview strong { font-size: 18px; }
+}
+@media (max-width: 360px) { .gst-simple-fields, .gst-simple-product-fields { grid-template-columns: 1fr; } }
+@media print { .gst-simple-editor { display: none !important; } }
+
+
+/* ============================================================
+   SPLIT BILL EDITOR: LEFT EDIT FIELDS + RIGHT LIVE A4 BILL
+   Only active while editing. Normal bill view stays unchanged.
+   ============================================================ */
+.gst-invoice-app.gst-split-edit-mode {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  background: #f2f5fb;
+  padding-bottom: 26px;
+}
+
+.gst-bill-workspace:not(.is-editing),
+.gst-bill-workspace:not(.is-editing) .gst-live-bill,
+.gst-bill-workspace:not(.is-editing) .gst-bill-paper-scale {
+  display: contents;
+}
+
+.gst-bill-workspace.is-editing {
+  display: grid;
+  grid-template-columns: minmax(350px, 420px) minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+  width: 100%;
+  max-width: 1700px;
+  margin: 0 auto;
+  padding: 16px clamp(12px, 1.6vw, 28px) 20px;
+}
+
+/* LEFT: Keep only the editable customer and product form. */
+.gst-bill-workspace.is-editing .gst-simple-editor {
+  position: sticky;
+  top: 14px;
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100vh - 30px);
+  max-height: calc(100dvh - 30px);
+  margin: 0;
+  padding: 0 5px 12px 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c7d5eb transparent;
+  gap: 13px;
+}
+.gst-bill-workspace.is-editing .gst-simple-editor-heading {
+  padding: 18px 20px;
+  border-radius: 13px;
+}
+.gst-bill-workspace.is-editing .gst-simple-editor-panel {
+  padding: 17px;
+  border-radius: 13px;
+}
+.gst-bill-workspace.is-editing .gst-simple-fields,
+.gst-bill-workspace.is-editing .gst-simple-product-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.gst-bill-workspace.is-editing .gst-simple-description,
+.gst-bill-workspace.is-editing .gst-simple-wide { grid-column: 1 / -1; }
+.gst-bill-workspace.is-editing .gst-simple-editor-panel-head { gap: 10px; }
+.gst-bill-workspace.is-editing .gst-simple-editor-panel-head h3 { font-size: 14px; }
+.gst-bill-workspace.is-editing .gst-simple-editor-panel-head p { font-size: 11px; line-height: 1.5; }
+.gst-bill-workspace.is-editing .gst-simple-add-btn { margin-left: 0; width: 100%; }
+.gst-bill-workspace.is-editing .gst-simple-products-head > div { min-width: 0; flex: 1; }
+.gst-bill-workspace.is-editing .gst-simple-product { padding: 12px; }
+.gst-bill-workspace.is-editing .gst-simple-editor-footer { padding: 15px; }
+.gst-bill-workspace.is-editing .gst-simple-total-preview strong { display: block; margin: 6px 0 0; }
+.gst-bill-workspace.is-editing .gst-simple-footer-actions { width: 100%; }
+.gst-bill-workspace.is-editing .gst-simple-footer-actions button { flex: 1; }
+
+/* RIGHT: The actual bill component, not a fake representation. */
+.gst-bill-workspace.is-editing .gst-live-bill {
+  position: sticky;
+  top: 14px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-height: calc(100vh - 30px);
+  max-height: calc(100dvh - 30px);
+  overflow: hidden;
+  border: 1px solid #d6e0ee;
+  border-radius: 16px;
+  background: #e9edf5;
+  box-shadow: 0 15px 38px rgba(7, 30, 73, 0.09);
+}
+.gst-live-preview-head {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #d9e3f2;
+  background: #fff;
+}
+.gst-live-preview-head strong { display: block; color: #071e49; font-size: 14px; }
+.gst-live-preview-head div > span { display: block; margin-top: 4px; color: #667994; font-size: 11px; }
+.gst-live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 100px;
+  color: #135e4b;
+  background: #e9f6f0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .7px;
+  white-space: nowrap;
+}
+.gst-live-status span { width: 7px; height: 7px; border-radius: 50%; background: #25a47d; }
+.gst-bill-workspace.is-editing .gst-bill-paper-scale {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 12px 22px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c7d5eb transparent;
+  text-align: center;
+}
+.gst-bill-workspace.is-editing .gst-invoice-sheet {
+  box-sizing: border-box;
+  width: 210mm !important;
+  min-width: 210mm;
+  max-width: none !important;
+  margin: 0 auto !important;
+  zoom: .80;
+  text-align: left;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(7, 30, 73, 0.15);
+}
+@media (min-width: 1480px) {
+  .gst-bill-workspace.is-editing .gst-invoice-sheet { zoom: .94; }
+}
+@media (min-width: 1700px) {
+  .gst-bill-workspace.is-editing .gst-invoice-sheet { zoom: 1; }
+}
+
+/* On tablets/phones, stack editing above the preview. */
+@media (max-width: 1060px) {
+  .gst-bill-workspace.is-editing { grid-template-columns: minmax(0, 1fr); gap: 15px; }
+  .gst-bill-workspace.is-editing .gst-simple-editor,
+  .gst-bill-workspace.is-editing .gst-live-bill {
+    position: relative;
+    top: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .gst-bill-workspace.is-editing .gst-bill-paper-scale {
+    overflow-x: auto;
+    max-height: 76vh;
+    text-align: left;
+  }
+  .gst-bill-workspace.is-editing .gst-invoice-sheet { zoom: .92; }
+}
+@media (max-width: 600px) {
+  .gst-bill-workspace.is-editing { padding: 12px 9px 16px; }
+  .gst-bill-workspace.is-editing .gst-simple-fields,
+  .gst-bill-workspace.is-editing .gst-simple-product-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .gst-bill-workspace.is-editing .gst-simple-editor-heading { padding: 16px; }
+  .gst-bill-workspace.is-editing .gst-simple-editor-panel { padding: 14px; }
+  .gst-bill-workspace.is-editing .gst-bill-paper-scale { padding: 12px 8px; }
+  .gst-bill-workspace.is-editing .gst-invoice-sheet { zoom: .55; }
+  .gst-live-preview-head { padding: 12px; }
+  .gst-live-preview-head div > span { max-width: 220px; }
+}
+@media (max-width: 370px) {
+  .gst-bill-workspace.is-editing .gst-simple-fields,
+  .gst-bill-workspace.is-editing .gst-simple-product-fields { grid-template-columns: 1fr; }
+}
+@media print {
+  .gst-invoice-app.gst-split-edit-mode { max-width: none !important; width: 100% !important; padding: 0 !important; background: #fff !important; }
+  .gst-bill-workspace.is-editing { display: block !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+  .gst-bill-workspace.is-editing .gst-simple-editor,
+  .gst-live-preview-head { display: none !important; }
+  .gst-bill-workspace.is-editing .gst-live-bill,
+  .gst-bill-workspace.is-editing .gst-bill-paper-scale {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .gst-bill-workspace.is-editing .gst-invoice-sheet {
+    zoom: 1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
+
+/* ===============================================
+   Collapsible CONSIGNEE / BILL TO + editable total discount
+================================================ */
+.gst-simple-billto-head { flex-wrap: nowrap; margin-bottom: 16px; }
+.gst-simple-billto-head .gst-simple-panel-title { flex: 1; min-width: 0; }
+.gst-simple-collapse-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid #cddbef;
+  background: #f4f8ff;
+  color: #174c94;
+  font: 700 11px Inter, Arial, sans-serif;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+}
+.gst-simple-collapse-btn:hover { background: #e8f1ff; border-color: #a9c4ed; }
+.gst-simple-collapse-btn:focus-visible { outline: 3px solid #e4ad44; outline-offset: 2px; }
+.gst-simple-billto-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: #f3f7fd;
+  border: 1px solid #dce6f6;
+}
+.gst-simple-billto-summary strong { color: #071e49; font-size: 13px; }
+.gst-simple-billto-summary span { color: #60738e; font-size: 11px; line-height: 1.5; }
+/* The hidden attribute must not be overridden by child CSS. */
+.gst-simple-billto-panel [hidden] { display: none !important; }
+.gst-simple-discount-box {
+  margin-top: 18px;
+  border: 1px solid #d8e4f6;
+  border-left: 4px solid #e4ad44;
+  border-radius: 12px;
+  padding: 15px;
+  background: linear-gradient(140deg, #f7faff, #fff);
+}
+.gst-simple-discount-title strong { display: block; color: #071e49; font-size: 14px; }
+.gst-simple-discount-title p { margin: 6px 0 13px; color: #627691; font-size: 11px; line-height: 1.65; }
+.gst-simple-discount-input { max-width: 260px; }
+.gst-simple-discount-input input { font-weight: 800; color: #10376f !important; }
+.gst-simple-discount-input input[aria-invalid="true"] { border-color: #b43239 !important; box-shadow: 0 0 0 3px rgba(180, 50, 57, .08) !important; }
+.gst-simple-discount-note { margin: 10px 0 0; font-size: 11px; line-height: 1.55; color: #667b96; }
+.gst-simple-discount-error { color: #a12a35; font-size: 11px; margin: 8px 0 0; font-weight: 700; }
+.gst-simple-discount-calculation {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid #dfe7f4;
+  color: #556b87;
+  font-size: 11px;
+}
+.gst-simple-discount-calculation strong { color: #174c94; }
+@media (max-width: 360px) {
+  .gst-simple-billto-head { flex-wrap: wrap; }
+  .gst-simple-collapse-btn { margin-left: 48px; }
+}
+@media print { .gst-simple-discount-box { display: none !important; } }
+
+
+/* ===============================================
+   COMPACT PRODUCT LIST / READ-ONLY DETAILS / EDITABLE DISCOUNTS
+   FONT CONSISTENCY FOR THE EDIT PAGE
+================================================ */
+.gst-invoice-app,
+.gst-simple-editor,
+.gst-toolbar,
+.gst-live-preview-head {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.gst-invoice-sheet {
+  font-family: Arial, Helvetica, sans-serif;
+  font-synthesis: none;
+}
+.gst-simple-products-head {
+  flex-wrap: nowrap;
+  margin-bottom: 15px;
+}
+.gst-simple-products-head .gst-simple-panel-title { flex: 1; min-width: 0; }
+.gst-simple-products-panel [hidden] { display: none !important; }
+.gst-simple-products-summary {
+  display: flex; flex-direction: column; gap: 5px;
+  border: 1px solid #dce6f6; border-radius: 10px;
+  padding: 11px 13px; background: #f4f8fd;
+}
+.gst-simple-products-summary strong { color: #071e49; font-size: 13px; }
+.gst-simple-products-summary span { color: #60738e; font-size: 11px; }
+.gst-simple-product-name {
+  display: block; color: #092f67; font-size: 13px;
+  line-height: 1.6; overflow-wrap: anywhere;
+}
+.gst-simple-product-meta {
+  display: flex; flex-wrap: wrap; gap: 8px 14px;
+  margin: 7px 0 13px; color: #687a93; font-size: 11px;
+}
+.gst-simple-product-values {
+  display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px;
+}
+.gst-simple-readonly-value {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 9px 11px; border: 1px solid #e2eaf5;
+  border-radius: 9px; background: #f7f9fd; min-width: 0;
+}
+.gst-simple-readonly-value span { color: #627692; font-size: 10px; font-weight: 700; }
+.gst-simple-readonly-value strong { color: #071e49; margin-top: 5px; font-size: 12px; }
+.gst-simple-item-discount { grid-column: 1 / -1; }
+.gst-simple-item-discount .gst-field {
+  border-color: #c9dbf4; background: #fffdf8;
+  font-size: 14px; font-weight: 800; color: #174c94;
+}
+.gst-simple-adjustments-panel .gst-simple-discount-box { margin-top: 0; }
+@media (max-width: 370px) {
+  .gst-simple-products-head { flex-wrap: wrap; }
+  .gst-simple-products-head .gst-simple-collapse-btn { margin-left: 48px; }
+}
+@media print {
+  .gst-simple-products-panel, .gst-simple-adjustments-panel { display: none !important; }
+}
+
+
+/* Product catalogue picker + individually collapsible, compact invoice rows */
+.gst-compact-catalog-search { margin: 0 0 14px; position: relative; }
+.gst-compact-catalog-search > label {
+  display: flex; gap: 7px; align-items: center; margin-bottom: 9px;
+  font-size: 12px; font-weight: 800; color: #071e49;
+}
+.gst-compact-catalog-search > label svg { color: #bd8424; }
+.gst-compact-catalog-input { position: relative; }
+.gst-compact-catalog-input > svg {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  pointer-events: none; color: #607699;
+}
+.gst-compact-catalog-input .gst-field { width: 100%; padding-left: 41px; }
+.gst-compact-catalog-results {
+  position: absolute; z-index: 50; left: 0; right: 0; top: 100%;
+  max-height: 260px; overflow-y: auto;
+  background: #fff; border: 1px solid #c9d8eb;
+  border-radius: 11px; box-shadow: 0 16px 40px rgba(7,30,73,.2);
+}
+.gst-compact-catalog-option {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 11px 12px; width: 100%; text-align: left;
+  border: 0; border-bottom: 1px solid #e9eef6; background: #fff;
+  cursor: pointer; color: #17345d;
+}
+.gst-compact-catalog-option:hover, .gst-compact-catalog-option:focus-visible { background: #f0f5fe; }
+.gst-compact-catalog-option > span { min-width: 0; display: grid; gap: 4px; }
+.gst-compact-catalog-option > span strong { font-size: 11px; color: #174c94; }
+.gst-compact-catalog-option > span small { font-size: 12px; overflow-wrap: anywhere; }
+.gst-compact-catalog-option > b { flex-shrink: 0; font-size: 12px; color: #071e49; }
+.gst-compact-catalog-empty { padding: 13px; margin: 0; font-size: 12px; color: #6c7890; }
+.gst-simple-product.gst-compact-product { padding: 0 !important; overflow: hidden; }
+.gst-compact-product-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; width: 100%; padding: 12px 14px;
+  border: 0; border-radius: 11px; background: #fafcff;
+  text-align: left; color: #071e49; cursor: pointer;
+}
+.gst-compact-product-head:hover { background: #f1f5ff; }
+.gst-compact-product-head:focus-visible { outline: 2px solid #174c94; outline-offset: -2px; }
+.gst-compact-product-head > svg { flex-shrink: 0; color: #174c94; }
+.gst-compact-product-identity { display: grid; gap: 3px; min-width: 0; }
+.gst-compact-product-identity > strong { color: #174c94; font-size: 11px; letter-spacing: .2px; }
+.gst-compact-product-identity > span { font-size: 13px; font-weight: 750; line-height: 1.5; overflow-wrap: anywhere; }
+.gst-compact-product-expanded { border-top: 1px solid #e3eaf5; padding: 12px 14px; background: #fff; }
+.gst-compact-product-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; margin-top: 12px;
+  color: #61738e; font-size: 12px;
+}
+.gst-compact-product-actions .gst-simple-remove { margin-left: auto; }
+@media (max-width: 370px) {
+  .gst-compact-product-head { padding: 10px; }
+  .gst-compact-product-expanded { padding: 10px; }
+}
+@media print { .gst-compact-catalog-search { display: none !important; } }
+
+
+/* Stock alerts: warning only, never mutate inventory or block invoicing. */
+.gst-compact-catalog-option.gst-stock-warning-option {
+  background: #fff1f2 !important;
+  border-left: 3px solid #dc2626;
+}
+.gst-compact-catalog-option.gst-stock-warning-option:hover { background: #ffe4e6 !important; }
+.gst-stock-warning-option strong,
+.gst-stock-warning-option small,
+.gst-stock-warning-option b { color: #b91c1c !important; }
+.gst-stock-warning-option .gst-stock-warning-text { font-size: 11px; font-weight: 800; }
+.gst-simple-product.gst-stock-warning-row { border-color: #fca5a5 !important; background: #fff1f2 !important; }
+.gst-stock-warning-row .gst-compact-product-head { background: #fff1f2 !important; }
+.gst-stock-warning-row .gst-compact-product-identity strong,
+.gst-stock-warning-row .gst-compact-product-identity span,
+.gst-stock-warning-row .gst-compact-product-head > svg { color: #b91c1c !important; }
+.gst-stock-warning-line { color: #b91c1c; font-weight: 800; font-size: 12px; margin: 0 0 12px; }
+.gst-invoice-app.gst-split-edit-mode .gst-products-table tr.gst-stock-warning-preview { background: #fff1f2; }
+.gst-invoice-app.gst-split-edit-mode .gst-products-table tr.gst-stock-warning-preview td,
+.gst-invoice-app.gst-split-edit-mode .gst-products-table tr.gst-stock-warning-preview strong,
+.gst-invoice-app.gst-split-edit-mode .gst-products-table tr.gst-stock-warning-preview span { color: #b91c1c !important; }
+@media print {
+  .gst-invoice-app .gst-products-table tr.gst-stock-warning-preview { background: transparent !important; }
+  .gst-invoice-app .gst-products-table tr.gst-stock-warning-preview td,
+  .gst-invoice-app .gst-products-table tr.gst-stock-warning-preview strong,
+  .gst-invoice-app .gst-products-table tr.gst-stock-warning-preview span { color: #111 !important; }
+}
+
+/* Quantity can be edited per expanded product, matching the navy/gold editor. */
+.gst-simple-editable-quantity {
+  background: #f0f6ff;
+  border-color: #b8d0f2;
+}
+.gst-simple-editable-quantity .gst-quantity-input {
+  width: 100%;
+  margin-top: 5px;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid #bfd2ec;
+  border-radius: 7px;
+  background: #fff;
+  color: #071e49;
+  font-size: 14px;
+  font-weight: 750;
+}
+.gst-simple-editable-quantity .gst-quantity-input:focus {
+  outline: 2px solid #174c94;
+  outline-offset: 1px;
+}
+
+
+/* ================================================================
+   PURCHASE-PRICE DISCOUNT RULE — UI STATES
+   JavaScript in page.jsx and billingDiscountLimit.js enforces the
+   limits. CSS only presents permitted/invalid inputs clearly.
+   ================================================================ */
+.gst-simple-editor .gst-simple-adjustments-panel,
+.gst-simple-editor .gst-simple-products-panel {
+  min-width: 0;
+}
+
+.gst-simple-discount-input {
+  width: min(100%, 310px);
+  max-width: 100%;
+}
+
+.gst-simple-discount-input > span,
+.gst-simple-item-discount > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 800;
+  color: #173b70;
+}
+
+.gst-simple-item-discount {
+  padding: 12px;
+  border: 1px solid #d9e5f5;
+  border-radius: 11px;
+  background: linear-gradient(140deg, #f9fbff, #fffaf1);
+}
+
+.gst-simple-item-discount .gst-field,
+.gst-simple-discount-input .gst-field {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+  font-weight: 800;
+  background: #ffffff;
+  border-color: #b9cdea;
+  color: #092959;
+}
+
+.gst-simple-item-discount .gst-field:hover,
+.gst-simple-discount-input .gst-field:hover {
+  border-color: #89abd7;
+}
+
+.gst-simple-item-discount .gst-field:focus-visible,
+.gst-simple-discount-input .gst-field:focus-visible {
+  outline: none;
+  border-color: #245b9d;
+  box-shadow: 0 0 0 3px rgba(36, 91, 157, .15);
+}
+
+/* Element <small> reports the maximum discount for each item. */
+.gst-simple-item-discount .gst-simple-discount-note {
+  display: flex;
+  align-items: center;
+  margin: 1px 0 0;
+  padding: 7px 10px;
+  border: 1px solid #dce7f4;
+  border-radius: 8px;
+  background: #f2f6fd;
+  color: #496381;
+  line-height: 1.45;
+  font-size: 11px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* Bill-wide message under the Discount (₹) input. */
+.gst-simple-adjustments-panel #gst-total-discount-help {
+  display: block;
+  margin-top: 12px;
+  color: #586d87;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.gst-simple-editor .gst-field[aria-invalid="true"] {
+  border: 2px solid #c13043 !important;
+  background: #fff8f8 !important;
+  color: #991b2b !important;
+  box-shadow: 0 0 0 3px rgba(193, 48, 67, .09) !important;
+}
+
+.gst-simple-discount-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid #fecdd3;
+  border-left: 3px solid #be123c;
+  border-radius: 9px;
+  background: #fff1f2;
+  color: #a11635;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.gst-simple-discount-calculation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+.gst-simple-discount-calculation > span {
+  min-width: 0;
+  color: #566c89;
+  font-variant-numeric: tabular-nums;
+}
+.gst-simple-discount-calculation > strong {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid #cadcf4;
+  background: #eff6ff;
+  color: #092c63;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Editable quantity next to read-only Rate, HSN/SAC and GST. */
+.gst-simple-product-values > * {
+  min-width: 0;
+}
+.gst-simple-editable-quantity {
+  justify-content: flex-start;
+  gap: 6px;
+}
+.gst-simple-editable-quantity .gst-quantity-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  margin: 0;
+  border: 1px solid #9fbce4;
+  border-radius: 9px;
+  background: #fff;
+  color: #0b2c5b;
+  font-size: 15px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+.gst-simple-editable-quantity .gst-quantity-input:focus-visible {
+  outline: none;
+  border-color: #245b9d;
+  box-shadow: 0 0 0 3px rgba(36,91,157,.14);
+}
+
+/* Product identity remains readable when rows start minimized. */
+.gst-simple-product.gst-compact-product {
+  min-width: 0;
+  border-color: #dce5f3;
+}
+.gst-compact-product-head {
+  min-height: 62px;
+  border-radius: 0;
+}
+.gst-compact-product-identity > span {
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+.gst-compact-product-expanded {
+  min-width: 0;
+}
+.gst-compact-product-actions > span {
+  color: #254e82;
+  font-size: 12px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Search dropdown can sit above product rows. */
+.gst-compact-catalog-search { z-index: 6; }
+.gst-compact-catalog-results { z-index: 8; }
+.gst-compact-catalog-option { font-family: inherit; }
+
+/* Editing-only messages & disabled actions are obvious. */
+.gst-simple-editor button:disabled,
+.gst-simple-editor input:disabled { cursor: not-allowed; opacity: .62; }
+.gst-simple-editor-footer { gap: 14px; }
+.gst-simple-total-preview strong { font-variant-numeric: tabular-nums; }
+.gst-bill-workspace.is-editing .gst-live-bill { isolation: isolate; }
+
+@media (max-width: 1250px) and (min-width: 1061px) {
+  .gst-bill-workspace.is-editing {
+    grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+    gap: 14px;
+  }
+  .gst-bill-workspace.is-editing .gst-invoice-sheet { zoom: .73; }
+}
+
+@media (max-width: 600px) {
+  .gst-simple-discount-box { padding: 12px; }
+  .gst-simple-discount-input { width: 100%; }
+  .gst-simple-product-values { gap: 9px; }
+  .gst-simple-item-discount { padding: 10px; }
+  .gst-simple-discount-calculation { gap: 8px; }
+  .gst-simple-discount-calculation > span { font-size: 11px; }
+  .gst-compact-product-identity > span { font-size: 12px; }
+}
+
+/* The official printed A4 bill remains controlled by bill.css.
+   No editor controls, errors, or stock warning tint on paper. */
+@media print {
+  .gst-simple-editor,
+  .gst-simple-discount-error,
+  .gst-simple-discount-note,
+  .gst-live-preview-head { display: none !important; }
+  .gst-invoice-sheet { box-shadow: none !important; }
+}

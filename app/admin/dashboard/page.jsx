@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import { StoreProvider } from "@/lib/store";
 import Shell from "@/components/Shell";
-
+import ServiceRequests from "@/components/ServiceRequests";
 import {
   Dashboard,
   Invoices,
@@ -19,15 +18,11 @@ import {
 
 function BillingDashboard() {
   const [page, setPage] = useState("dashboard");
-  const [selectedInvoice, setSelectedInvoice] =
-    useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   const go = (nextPage) => {
     setPage(nextPage);
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const view = (invoiceId) => {
@@ -37,16 +32,10 @@ function BillingDashboard() {
 
   const pages = {
     dashboard: <Dashboard go={go} view={view} />,
+    service: <ServiceRequests />,
     invoices: <Invoices go={go} view={view} />,
-    "invoice-detail": (
-      <InvoiceDetails
-        id={selectedInvoice}
-        go={go}
-      />
-    ),
-    "new-invoice": (
-      <NewInvoice go={go} view={view} />
-    ),
+    "invoice-detail": <InvoiceDetails id={selectedInvoice} go={go} />,
+    "new-invoice": <NewInvoice go={go} view={view} />,
     customers: <Customers />,
     products: <Products />,
     payments: <Payments view={view} />,
@@ -82,4 +71,3 @@ export default function AdminDashboardPage() {
     </StoreProvider>
   );
 }
-

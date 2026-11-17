@@ -9,6 +9,15 @@ import {
 export async function middleware(request) {
   const { pathname, search } = request.nextUrl;
 
+  if (
+    pathname === "/" ||
+    pathname === "/client-request" ||
+    (pathname === "/api/client-requests" &&
+      request.method === "POST")
+  ) {
+    return NextResponse.next();
+  }
+
   const secret = process.env.ADMIN_SESSION_SECRET;
 
   const token = request.cookies.get(
